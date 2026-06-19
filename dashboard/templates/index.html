@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+    <meta charset="utf-8">
+
+    <title>Smart Greenhouse Control Center</title>
+
+    <link
+        rel="stylesheet"
+        href="/static/style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</head>
+
+<body>
+
+<h1>🌱 Smart Greenhouse Control Center</h1>
+
+<!-- ===================================== -->
+<!-- SENSOR CARDS -->
+<!-- ===================================== -->
+
+<div class="grid">
+
+    <div class="card">
+
+        <h3>Temperature</h3>
+
+        <div
+            id="temp"
+            class="big">
+
+            0
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h3>Humidity</h3>
+
+        <div
+            id="humidity"
+            class="big">
+
+            0
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h3>Light</h3>
+
+        <div
+            id="light"
+            class="big">
+
+            0
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h3>Sound</h3>
+
+        <div
+            id="sound"
+            class="big">
+
+            0
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h3>Moisture</h3>
+
+        <div
+            id="moisture"
+            class="big">
+
+            0
+
+        </div>
+
+    </div>
+
+</div>
+
+<br>
+
+<!-- ===================================== -->
+<!-- CONTROL CARDS -->
+<!-- ===================================== -->
+
+<div class="grid">
+
+    <div class="card">
+
+        <h3>Motion</h3>
+
+        <div
+            id="motion"
+            class="big">
+
+            None
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <h3>LED</h3>
+
+        <div
+            id="led_state"
+            class="big">
+
+            OFF
+
+        </div>
+
+        <button
+            id="led_btn"
+            class="toggle"
+            onclick="toggleLED()">
+
+            Toggle
+
+        </button>
+
+    </div>
+
+    <div class="card">
+
+        <h3>Relay 1 (Fan)</h3>
+
+        <div
+            id="relay_state"
+            class="big">
+
+            OFF
+
+        </div>
+
+        <button
+            id="relay1_btn"
+            class="toggle"
+            onclick="toggleRelay()">
+
+            Toggle
+
+        </button>
+
+    </div>
+
+    <div class="card">
+
+        <h3>Relay 2 (Pump)</h3>
+
+        <div
+            id="relay2_state"
+            class="big">
+
+            OFF
+
+        </div>
+
+        <button
+            id="relay2_btn"
+            class="toggle"
+            onclick="toggleRelay2()">
+
+            Toggle
+
+        </button>
+
+    </div>
+
+    <div class="card">
+
+        <h3>Greenhouse Health</h3>
+
+        <div
+            id="health"
+            class="big">
+
+            100%
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ===================================== -->
+<!-- SYSTEM STATUS -->
+<!-- ===================================== -->
+
+<div class="panel">
+
+    <h2>System Status</h2>
+
+    Publisher :
+    <span id="publisher">
+        OFFLINE
+    </span>
+
+    <br>
+
+    Actuator :
+    <span id="actuator">
+        OFFLINE
+    </span>
+
+    <br>
+
+    Planner :
+    <span id="planner_status">
+        OFFLINE
+    </span>
+
+    <br>
+
+    Dashboard :
+    <span class="online">
+        ONLINE
+    </span>
+
+</div>
+
+<!-- ===================================== -->
+<!-- MODE -->
+<!-- ===================================== -->
+
+<div class="panel">
+
+    <h2>Operating Mode</h2>
+
+    <div
+        id="mode"
+        class="big">
+
+        LOADING
+
+    </div>
+
+    <br>
+
+    <button
+        class="toggle"
+        onclick="toggleMode()">
+
+        Toggle Mode
+
+    </button>
+
+</div>
+
+<!-- ===================================== -->
+<!-- PLANNER -->
+<!-- ===================================== -->
+
+<div class="panel">
+
+    <h2>Planner Panel</h2>
+
+    <pre id="planner">
+
+Waiting for planner...
+
+    </pre>
+
+</div>
+
+<!-- ===================================== -->
+<!-- CHARTS -->
+<!-- ===================================== -->
+
+<div class="panel">
+
+    <h2>Temperature Trend</h2>
+
+    <canvas id="tempChart"></canvas>
+
+</div>
+
+<div class="panel">
+
+    <h2>Humidity Trend</h2>
+
+    <canvas id="humChart"></canvas>
+
+</div>
+
+<div class="panel">
+
+    <h2>Light Trend</h2>
+
+    <canvas id="lightChart"></canvas>
+
+</div>
+
+<!-- ===================================== -->
+<!-- EVENT LOG -->
+<!-- ===================================== -->
+
+<div class="panel">
+
+    <h2>Activity Log</h2>
+
+    <div id="events">
+
+        No events yet.
+
+    </div>
+
+</div>
+
+<script src="/static/app.js"></script>
+
+</body>
+
+</html>

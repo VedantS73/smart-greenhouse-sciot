@@ -1,0 +1,353 @@
+#!/usr/bin/env python3
+
+import json
+import time
+import threading
+import paho.mqtt.client as mqtt
+
+BROKER = "localhost"
+
+client = mqtt.Client()
+
+current_state = {
+    "led": False,
+    "relay1": False,
+    "relay2": False
+}
+
+AUTO_MODE = True
+
+# ---------------------------------
+# HEARTBEAT
+# ---------------------------------
+
+def heartbeat():
+
+    while True:
+
+        client.publish(
+            "greenhouse/status",
+            json.dumps({
+                "service": "planner",
+                "timestamp": time.time()
+            })
+        )
+
+        time.sleep(10)
+
+# ---------------------------------
+# CONTEXT MODEL
+# ---------------------------------
+
+def get_context(data):
+
+    context = {}
+
+    temp = data.get("temperature", 0)
+    humidity = data.get("humidity", 0)
+    light = data.get("light", 0)
+    moisture = data.get("moisture", 0)
+    motion = data.get("motion", False)
+
+    # -----------------
+    # LIGHT
+    # -----------------
+
+    if light < 200:
+
+        context["light"] = "LOW"
+
+    elif light > 350:
+
+        context["light"] = "HIGH"
+
+    else:
+
+        context["light"] = "NORMAL"
+
+    # -----------------
+    # TEMPERATURE
+    # -----------------
+
+    if temp > 30:
+
+        context["temperature"] = "HOT"
+
+    elif temp < 20:
+
+        context["temperature"] = "COLD"
+
+    else:
+
+        context["temperature"] = "NORMAL"
+
+    # -----------------
+    # HUMIDITY
+    # -----------------
+
+    if humidity < 40:
+
+        context["humidity"] = "DRY"
+
+    elif humidity > 70:
+
+        context["humidity"] = "WET"
+
+    else:
+
+        context["humidity"] = "NORMAL"
+
+    # -----------------
+    # SOIL MOISTURE
+    # -----------------
+
+    if moisture > 650:
+
+        context["soil"] = "DRY"
+
+    elif moisture < 450:
+
+        context["soil"] = "WET"
+
+    else:
+
+        context["soil"] = "NORMAL"
+
+    # -----------------
+    # MOTION
+    # -----------------
+
+    context["motion"] = (
+        "DETECTED"
+        if motion
+        else "NONE"
+    )
+
+    return context
+
+# ---------------------------------
+# GOAL MODEL
+# ---------------------------------
+
+def get_goal():
+
+    return {
+
+        "light": "NORMAL",
+
+        "temperature": "NORMAL",
+
+        "humidity": "NORMAL",
+
+        "soil": "NORMAL"
+
+    }
+
+# ---------------------------------
+# PLANNER
+# ---------------------------------
+
+def generate_plan(context):
+
+    actions = {}
+
+    # -----------------
+    # GROW LIGHT
+    # -----------------
+
+    if context["light"] == "LOW":
+
+        actions["led"] = True
+
+    elif context["light"] == "HIGH":
+
+        actions["led"] = False
+
+    # -----------------
+    # FAN RELAY
+    # Relay1
+    # -----------------
+
+    if context["temperature"] == "HOT":
+
+        actions["relay1"] = True
+
+    elif context["temperature"] == "NORMAL":
+
+        actions["relay1"] = False
+
+    # -----------------
+    # WATER PUMP
+    # Relay2
+    # -----------------
+
+    if context["soil"] == "DRY":
+
+        actions["relay2"] = True
+
+    elif context["soil"] == "WET":
+
+        actions["relay2"] = False
+
+    return actions
+
+# ---------------------------------
+# ACTUATOR STATUS
+# ---------------------------------
+
+def update_actuator_state(payload):
+
+    global current_state
+
+    current_state = payload
+
+# ---------------------------------
+# MQTT CALLBACK
+# ---------------------------------
+
+def on_message(client, userdata, msg):
+
+    global AUTO_MODE
+
+    try:
+
+        # -----------------
+        # ACTUATOR FEEDBACK
+        # -----------------
+
+        if msg.topic == "greenhouse/actuator_status":
+
+            payload = json.loads(
+                msg.payload.decode()
+            )
+
+            update_actuator_state(payload)
+
+            return
+
+        # -----------------
+        # AUTO / MANUAL MODE
+        # -----------------
+
+        if msg.topic == "greenhouse/mode":
+
+            payload = json.loads(
+                msg.payload.decode()
+            )
+
+            AUTO_MODE = (
+                payload["mode"]
+                == "AUTO"
+            )
+
+            print(
+                "\nMode Changed:",
+                payload["mode"]
+            )
+
+            return
+
+        # -----------------
+        # SENSOR DATA
+        # -----------------
+
+        sensor_data = json.loads(
+            msg.payload.decode()
+        )
+
+        context = get_context(
+            sensor_data
+        )
+
+        goal = get_goal()
+
+        actions = generate_plan(
+            context
+        )
+
+        print("\n===================================")
+        print("Current Context")
+        print(context)
+
+        print("\nGoal State")
+        print(goal)
+
+        print("\nPlanner Actions")
+        print(actions)
+
+        print("\nAuto Mode")
+        print(AUTO_MODE)
+
+        # -----------------
+        # EXECUTE PLAN
+        # -----------------
+
+        if AUTO_MODE and len(actions) > 0:
+
+            client.publish(
+                "greenhouse/actions",
+                json.dumps(actions)
+            )
+
+        # -----------------
+        # PLANNER STATUS
+        # -----------------
+
+        client.publish(
+            "greenhouse/planner",
+            json.dumps({
+
+                "context": context,
+
+                "goal": goal,
+
+                "actions": actions,
+
+                "auto_mode": AUTO_MODE,
+
+                "timestamp": time.time()
+
+            })
+        )
+
+    except Exception as e:
+
+        print(
+            "Planner Error:",
+            e
+        )
+
+# ---------------------------------
+# MQTT SETUP
+# ---------------------------------
+
+client.on_message = on_message
+
+client.connect(
+    BROKER,
+    1883,
+    60
+)
+
+client.subscribe(
+    "greenhouse/sensors"
+)
+
+client.subscribe(
+    "greenhouse/actuator_status"
+)
+
+client.subscribe(
+    "greenhouse/mode"
+)
+
+threading.Thread(
+    target=heartbeat,
+    daemon=True
+).start()
+
+print("===================================")
+print(" Smart Greenhouse Planner Running")
+print("===================================")
+
+client.loop_forever()
