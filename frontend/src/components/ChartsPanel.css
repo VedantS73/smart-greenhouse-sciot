@@ -1,0 +1,64 @@
+.charts-panel {
+  grid-column: span 1;
+}
+
+.charts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+.chart-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.chart-btn {
+  padding: 0.5rem 1rem;
+  background: var(--gray-100);
+  border: 2px solid var(--gray-200);
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.chart-btn:hover {
+  border-color: var(--primary);
+  background: var(--gray-50);
+}
+
+.chart-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.chart-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: var(--gray-400);
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .charts-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .chart-buttons {
+    width: 100%;
+  }
+
+  .chart-btn {
+    flex: 1;
+    min-width: 80px;
+  }
+}
