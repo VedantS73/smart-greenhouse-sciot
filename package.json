@@ -4,6 +4,7 @@
   "description": "Smart Greenhouse IoT System with Real-time Dashboard",
   "main": "server.js",
   "scripts": {
+    "postinstall": "cd frontend && npm install",
     "start": "concurrently --names \"Server,Client\" \"npm run server\" \"npm run client\"",
     "server": "node server.js",
     "client": "cd frontend && npm start",

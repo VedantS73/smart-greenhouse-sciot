@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const os = require('os');
 const socketIo = require('socket.io');
 const mqtt = require('mqtt');
 const cors = require('cors');
@@ -255,8 +256,25 @@ io.on('connection', (socket) => {
 // ============================
 
 const PORT = process.env.PORT || 5000;
+const HOST = process.env.HOST || '0.0.0.0';
 
-server.listen(PORT, () => {
-  console.log(`\n🌱 Smart Greenhouse Server running on http://localhost:${PORT}`);
+function getNetworkAddresses() {
+  const addresses = [];
+  for (const interfaces of Object.values(os.networkInterfaces())) {
+    for (const iface of interfaces) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        addresses.push(iface.address);
+      }
+    }
+  }
+  return addresses;
+}
+
+server.listen(PORT, HOST, () => {
+  console.log(`\n🌱 Smart Greenhouse Server running on port ${PORT}`);
+  console.log(`   Local:   http://localhost:${PORT}`);
+  for (const address of getNetworkAddresses()) {
+    console.log(`   Network: http://${address}:${PORT}`);
+  }
   console.log(`📡 WebSocket ready for real-time updates\n`);
 });
