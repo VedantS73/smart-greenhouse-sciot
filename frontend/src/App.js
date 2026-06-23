@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { message } from 'antd';
 import io from 'socket.io-client';
 import Dashboard from './components/Dashboard';
 import './App.css';
@@ -72,6 +73,8 @@ function App() {
     });
 
     s.on('actuator_ack', ({ device }) => {
+      const labels = { led: 'LED', relay1: 'Fan', relay2: 'Pump' };
+      message.success(`${labels[device] || device} confirmed`);
       setActuatorFeedback((prev) => ({
         ...prev,
         [device]: { status: 'ok', message: 'Confirmed' }
@@ -91,6 +94,8 @@ function App() {
         hardware_mismatch: 'Hardware state mismatch',
         auto_mode_active: 'Switch to MANUAL mode first'
       };
+      const labels = { led: 'LED', relay1: 'Fan', relay2: 'Pump' };
+      message.error(`${labels[device] || device}: ${messages[reason] || 'Command failed'}`);
       setActuatorFeedback((prev) => ({
         ...prev,
         [device]: {

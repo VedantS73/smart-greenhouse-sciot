@@ -1,4 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
+import {
+  Layout,
+  Space,
+  Switch,
+  Badge,
+  Typography,
+  Row,
+  Col,
+  Drawer,
+  Button,
+  Tooltip
+} from 'antd';
+import {
+  ExperimentOutlined,
+  UnorderedListOutlined,
+  ApiOutlined
+} from '@ant-design/icons';
 import SensorPanel from './SensorPanel';
 import ActuatorPanel from './ActuatorPanel';
 import HealthStatus from './HealthStatus';
@@ -6,9 +23,12 @@ import ChartsPanel from './ChartsPanel';
 import PlannerPanel from './PlannerPanel';
 import EventLog from './EventLog';
 import './Dashboard.css';
-import { Leaf, Activity } from 'lucide-react';
+
+const { Header, Content, Footer } = Layout;
+const { Title, Text } = Typography;
 
 function Dashboard({ data, socket, connected, actuatorFeedback, setActuatorFeedback }) {
+  const [logOpen, setLogOpen] = useState(false);
   const autoMode = data.planner?.auto_mode !== false;
   const readings = data.sensors?.readings || {};
   const sensorMeta = data.sensors?.meta || {};
@@ -35,88 +55,106 @@ function Dashboard({ data, socket, connected, actuatorFeedback, setActuatorFeedb
     return Math.max(0, score);
   };
 
-  const handleModeToggle = () => {
-    const newMode = autoMode ? 'manual' : 'auto';
-    socket.emit('set_mode', newMode);
+  const handleModeToggle = (checked) => {
+    socket.emit('set_mode', checked ? 'auto' : 'manual');
   };
 
   const healthScore = getHealthScore();
+  const eventCount = data.events?.length || 0;
 
   return (
-    <div className={`dashboard ${connected ? 'connected' : 'disconnected'}`}>
-      <header className="dashboard-header">
-        <div className="header-content">
-          <div className="header-left">
-            <div className="logo">
-              <Leaf size={32} className="logo-icon" />
-              <h1>Smart Greenhouse</h1>
-            </div>
-          </div>
-
-          <div className="header-right">
-            <div className={`connection-status ${connected ? 'online' : 'offline'}`}>
-              <div className="status-dot" />
-              <span>{connected ? 'Live' : 'Offline'}</span>
-            </div>
-
-            <button
-              type="button"
-              className={`mode-toggle ${autoMode ? 'auto' : 'manual'}`}
-              onClick={handleModeToggle}
-            >
-              {autoMode ? 'AUTO' : 'MANUAL'}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="dashboard-main">
-        <div className="grid-row">
-          <HealthStatus score={healthScore} />
-          <SensorPanel readings={readings} meta={sensorMeta} />
+    <Layout className="dashboard-layout">
+      <Header className="dashboard-header">
+        <div className="header-brand">
+          <ExperimentOutlined className="header-logo" />
+          <Title level={4} className="header-title">Smart Greenhouse</Title>
         </div>
 
-        <div className="grid-row full-width">
-          <ChartsPanel history={data.history} />
-        </div>
+        <Space size="middle" className="header-actions">
+          <Badge status={connected ? 'success' : 'error'} text={connected ? 'Live' : 'Offline'} />
+          <Space size={4}>
+            <Text type="secondary" className="mode-label">Mode</Text>
+            <Switch
+              checked={autoMode}
+              onChange={handleModeToggle}
+              checkedChildren="Auto"
+              unCheckedChildren="Manual"
+            />
+          </Space>
+          <Tooltip title="Activity log">
+            <Badge count={eventCount} size="small" offset={[-2, 2]}>
+              <Button
+                type="text"
+                icon={<UnorderedListOutlined />}
+                onClick={() => setLogOpen(true)}
+              />
+            </Badge>
+          </Tooltip>
+        </Space>
+      </Header>
 
-        <div className="grid-row">
-          <ActuatorPanel
-            actuators={data.actuators}
-            socket={socket}
-            autoMode={autoMode}
-            actuatorFeedback={actuatorFeedback}
-            setActuatorFeedback={setActuatorFeedback}
-          />
+      <Content className="dashboard-content">
+        <Row gutter={[12, 12]} className="row-sensors">
+          <Col flex="140px">
+            <HealthStatus score={healthScore} />
+          </Col>
+          <Col flex="auto">
+            <SensorPanel readings={readings} meta={sensorMeta} />
+          </Col>
+        </Row>
+
+        <Row gutter={12} className="row-charts">
+          <Col flex="auto" className="charts-col">
+            <ChartsPanel history={data.history} />
+          </Col>
+          <Col flex="88px" className="actuators-col">
+            <ActuatorPanel
+              actuators={data.actuators}
+              socket={socket}
+              autoMode={autoMode}
+              actuatorFeedback={actuatorFeedback}
+              setActuatorFeedback={setActuatorFeedback}
+            />
+          </Col>
+        </Row>
+
+        <div className="row-planner">
           <PlannerPanel planner={data.planner} actuators={data.actuators} />
         </div>
+      </Content>
 
-        <div className="grid-row full-width">
-          <EventLog events={data.events} />
-        </div>
-      </main>
+      <Footer className="dashboard-footer">
+        <Space size="large">
+          <Space size={6}>
+            <Badge status={data.health?.publisher?.online ? 'success' : 'error'} />
+            <Text type="secondary">Publisher</Text>
+          </Space>
+          <Space size={6}>
+            <Badge status={data.health?.actuator?.online ? 'success' : 'error'} />
+            <Text type="secondary">Actuator</Text>
+          </Space>
+          <Space size={6}>
+            <Badge status={data.health?.planner?.online ? 'success' : 'error'} />
+            <Text type="secondary">Planner</Text>
+          </Space>
+        </Space>
+        <Space size={6}>
+          <ApiOutlined />
+          <Text type="secondary">Health: <Text strong style={{ color: '#4ade80' }}>{healthScore}%</Text></Text>
+        </Space>
+      </Footer>
 
-      <footer className="dashboard-footer">
-        <div className="services-status">
-          <div className="service-item">
-            <span className={`status-indicator ${data.health?.publisher?.online ? 'online' : 'offline'}`} />
-            <span>Publisher</span>
-          </div>
-          <div className="service-item">
-            <span className={`status-indicator ${data.health?.actuator?.online ? 'online' : 'offline'}`} />
-            <span>Actuator</span>
-          </div>
-          <div className="service-item">
-            <span className={`status-indicator ${data.health?.planner?.online ? 'online' : 'offline'}`} />
-            <span>Planner</span>
-          </div>
-        </div>
-        <div className="health-score">
-          <Activity size={18} />
-          <span>Greenhouse Health: <strong>{healthScore}%</strong></span>
-        </div>
-      </footer>
-    </div>
+      <Drawer
+        title="Activity Log"
+        placement="right"
+        width={360}
+        open={logOpen}
+        onClose={() => setLogOpen(false)}
+        className="event-drawer"
+      >
+        <EventLog events={data.events} />
+      </Drawer>
+    </Layout>
   );
 }
 

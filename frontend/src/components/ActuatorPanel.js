@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
-import { Lightbulb, Power } from 'lucide-react';
-import './Panel.css';
+import { Card, Button, Tooltip, Typography, message } from 'antd';
+import {
+  BulbOutlined,
+  ThunderboltOutlined,
+  DropboxOutlined
+} from '@ant-design/icons';
+
+const { Text } = Typography;
 
 const ACTUATORS = [
-  { id: 'led', icon: Lightbulb, label: 'LED Light', color: '#fbbf24' },
-  { id: 'relay1', icon: Power, label: 'Relay 1 (Fan)', color: '#f87171' },
-  { id: 'relay2', icon: Power, label: 'Relay 2 (Pump)', color: '#06b6d4' }
+  { id: 'led', icon: BulbOutlined, label: 'LED', color: '#fbbf24' },
+  { id: 'relay1', icon: ThunderboltOutlined, label: 'Fan', color: '#f87171' },
+  { id: 'relay2', icon: DropboxOutlined, label: 'Pump', color: '#06b6d4' }
 ];
 
 function ActuatorPanel({
@@ -16,9 +22,13 @@ function ActuatorPanel({
   setActuatorFeedback
 }) {
   const [pending, setPending] = useState({});
+  const [msgApi, contextHolder] = message.useMessage();
 
-  const handleToggle = (device) => {
-    if (autoMode) return;
+  const handleToggle = (device, label) => {
+    if (autoMode) {
+      msgApi.warning('Switch to Manual mode to control actuators');
+      return;
+    }
 
     const state = !actuators[device];
     setPending((prev) => ({ ...prev, [device]: true }));
@@ -36,46 +46,93 @@ function ActuatorPanel({
   };
 
   return (
-    <div className="panel">
-      <h2 className="panel-title">Actuators</h2>
-      {autoMode && (
-        <p className="auto-mode-notice">
-          AUTO mode is active. Switch to MANUAL to control actuators.
-        </p>
-      )}
-      <div className="actuators-grid">
+    <Card
+      size="small"
+      title="Actuators"
+      bordered={false}
+      className="actuators-card"
+    >
+      {contextHolder}
+      <div className="actuators-stack">
         {ACTUATORS.map(({ id, icon: Icon, label, color }) => {
           const isActive = actuators[id] ?? false;
           const isPending = pending[id];
           const feedback = actuatorFeedback[id];
-          const cardClass = [
-            'actuator-card',
-            isPending ? 'pending' : '',
-            feedback?.status === 'error' ? 'error' : ''
-          ].filter(Boolean).join(' ');
+          const hasError = feedback?.status === 'error';
 
           return (
-            <div key={id} className={cardClass}>
-              <div className="actuator-icon" style={{ color }}>
-                <Icon size={28} />
-              </div>
-              <span className="actuator-label">{label}</span>
-              <button
-                type="button"
-                className={`toggle-switch ${isActive ? 'active' : ''}`}
-                onClick={() => handleToggle(id)}
-                disabled={autoMode || isPending}
-                aria-label={`Toggle ${label}`}
+            <Tooltip
+              key={id}
+              title={
+                autoMode
+                  ? 'AUTO mode — switch to Manual'
+                  : `${label}: ${isActive ? 'ON' : 'OFF'}${hasError ? ` — ${feedback.message}` : ''}`
+              }
+            >
+              <Button
+                type={isActive ? 'primary' : 'default'}
+                shape="circle"
+                size="large"
+                icon={<Icon />}
+                loading={isPending && !hasError}
+                danger={hasError}
+                disabled={autoMode}
+                onClick={() => handleToggle(id, label)}
+                className="actuator-btn"
+                style={{
+                  borderColor: isActive ? color : undefined,
+                  background: isActive ? color : undefined
+                }}
               />
-              <div className={`actuator-feedback ${feedback?.status || ''}`}>
-                {isPending && !feedback && 'Waiting for hardware...'}
-                {feedback?.message}
-              </div>
-            </div>
+            </Tooltip>
           );
         })}
       </div>
-    </div>
+      {autoMode && (
+        <Text type="secondary" className="auto-hint">AUTO</Text>
+      )}
+      <style>{`
+        .actuators-card {
+          height: 100%;
+          background: rgba(30, 41, 59, 0.65) !important;
+          border: 1px solid rgba(148, 163, 184, 0.1) !important;
+        }
+        .actuators-card .ant-card-head {
+          min-height: 36px;
+          padding: 0 10px;
+          border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+        }
+        .actuators-card .ant-card-head-title {
+          font-size: 12px;
+          padding: 8px 0;
+          text-align: center;
+        }
+        .actuators-card .ant-card-body {
+          padding: 10px 8px !important;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: calc(100% - 36px);
+          gap: 8px;
+        }
+        .actuators-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          align-items: center;
+        }
+        .actuator-btn {
+          width: 48px !important;
+          height: 48px !important;
+          font-size: 20px !important;
+        }
+        .auto-hint {
+          font-size: 10px;
+          text-align: center;
+        }
+      `}</style>
+    </Card>
   );
 }
 

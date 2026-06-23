@@ -1,31 +1,40 @@
 import React from 'react';
-import { Droplet, Sun, Gauge, Volume2, Leaf, Zap } from 'lucide-react';
-import './Panel.css';
+import { Card, Row, Col, Typography, Tag, Tooltip } from 'antd';
+import {
+  CloudOutlined,
+  SunOutlined,
+  FireOutlined,
+  SoundOutlined,
+  DropboxOutlined,
+  RadarChartOutlined
+} from '@ant-design/icons';
+
+const { Text } = Typography;
 
 const SENSOR_CONFIG = [
-  { key: 'humidity', icon: Droplet, label: 'Humidity', unit: '%', color: '#3b82f6' },
-  { key: 'light', icon: Sun, label: 'Light', unit: '', color: '#f59e0b' },
-  { key: 'temperature', icon: Gauge, label: 'Temperature', unit: '°C', color: '#ef4444' },
-  { key: 'sound', icon: Volume2, label: 'Sound', unit: '', color: '#8b5cf6' },
-  { key: 'moisture', icon: Leaf, label: 'Moisture', unit: '', color: '#10b981' },
-  { key: 'motion', icon: Zap, label: 'Motion', unit: '', color: '#ec4899', isMotion: true }
+  { key: 'humidity', icon: CloudOutlined, label: 'Humidity', unit: '%', color: '#3b82f6' },
+  { key: 'light', icon: SunOutlined, label: 'Light', unit: '', color: '#f59e0b' },
+  { key: 'temperature', icon: FireOutlined, label: 'Temp', unit: '°C', color: '#ef4444' },
+  { key: 'sound', icon: SoundOutlined, label: 'Sound', unit: '', color: '#8b5cf6' },
+  { key: 'moisture', icon: DropboxOutlined, label: 'Moisture', unit: '', color: '#10b981' },
+  { key: 'motion', icon: RadarChartOutlined, label: 'Motion', unit: '', color: '#ec4899', isMotion: true }
 ];
 
-function formatValue(key, value, isMotion) {
-  if (isMotion) {
-    return value ? 'Detected' : 'None';
-  }
-  if (typeof value === 'number') {
-    return value.toFixed(1);
-  }
+function formatValue(value, isMotion) {
+  if (isMotion) return value ? 'Yes' : 'No';
+  if (typeof value === 'number') return value.toFixed(1);
   return '--';
 }
 
 function SensorPanel({ readings, meta }) {
   return (
-    <div className="panel sensors-panel">
-      <h2 className="panel-title">Sensor Readings</h2>
-      <div className="sensors-grid">
+    <Card
+      size="small"
+      title="Sensor Readings"
+      bordered={false}
+      className="sensors-card"
+    >
+      <Row gutter={[8, 0]} wrap={false}>
         {SENSOR_CONFIG.map(({ key, icon: Icon, label, unit, color, isMotion }) => {
           const fieldMeta = meta[key] || { stale: true, invalid: false };
           const stale = fieldMeta.stale;
@@ -34,31 +43,75 @@ function SensorPanel({ readings, meta }) {
           const hasValue = value !== undefined && !stale;
 
           return (
-            <div
-              key={key}
-              className={`sensor-card ${stale ? 'stale' : ''} ${invalid ? 'invalid' : ''}`}
-            >
-              <div className="sensor-icon" style={{ color }}>
-                <Icon size={24} />
-              </div>
-              <div className="sensor-content">
-                <span className="sensor-label">{label}</span>
-                <div className="sensor-value">
-                  {hasValue ? formatValue(key, value, isMotion) : '--'}
+            <Col flex={1} key={key}>
+              <div className={`sensor-tile ${stale ? 'stale' : ''}`}>
+                <Icon style={{ color, fontSize: 16 }} />
+                <Text type="secondary" className="sensor-name">{label}</Text>
+                <Text strong className="sensor-val">
+                  {hasValue ? formatValue(value, isMotion) : '--'}
                   {hasValue && unit && !isMotion ? unit : ''}
-                </div>
+                </Text>
                 {stale && (
-                  <span className="sensor-badge stale">No data</span>
+                  <Tooltip title="No data for 15+ seconds">
+                    <Tag color="error" className="sensor-tag">Stale</Tag>
+                  </Tooltip>
                 )}
                 {invalid && !stale && (
-                  <span className="sensor-badge invalid">Invalid</span>
+                  <Tag color="warning" className="sensor-tag">Invalid</Tag>
                 )}
               </div>
-            </div>
+            </Col>
           );
         })}
-      </div>
-    </div>
+      </Row>
+      <style>{`
+        .sensors-card {
+          height: 100%;
+          background: rgba(30, 41, 59, 0.65) !important;
+          border: 1px solid rgba(148, 163, 184, 0.1) !important;
+        }
+        .sensors-card .ant-card-head {
+          min-height: 36px;
+          padding: 0 12px;
+          border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+        }
+        .sensors-card .ant-card-head-title {
+          font-size: 13px;
+          padding: 8px 0;
+        }
+        .sensors-card .ant-card-body {
+          padding: 10px 12px !important;
+        }
+        .sensor-tile {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 2px;
+          padding: 6px 4px;
+          border-radius: 8px;
+          background: rgba(15, 23, 42, 0.5);
+          border: 1px solid rgba(148, 163, 184, 0.08);
+          min-width: 0;
+        }
+        .sensor-tile.stale {
+          border-color: rgba(239, 68, 68, 0.35);
+        }
+        .sensor-name {
+          font-size: 10px;
+          white-space: nowrap;
+        }
+        .sensor-val {
+          font-size: 15px;
+          line-height: 1.2;
+        }
+        .sensor-tag {
+          font-size: 9px;
+          line-height: 14px;
+          margin: 0;
+          padding: 0 4px;
+        }
+      `}</style>
+    </Card>
   );
 }
 
