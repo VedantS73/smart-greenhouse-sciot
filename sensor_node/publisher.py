@@ -17,6 +17,14 @@ MOISTURE_SENSOR = 2
 TEMP_SENSOR = 7
 PIR_SENSOR = 8
 
+LIMITS = {
+    "temperature": (-10, 60),
+    "humidity": (0, 100),
+    "light": (0, 1023),
+    "sound": (0, 1023),
+    "moisture": (0, 1023),
+}
+
 grovepi.pinMode(
     PIR_SENSOR,
     "INPUT"
@@ -32,9 +40,21 @@ client.connect(
     60
 )
 
-# ---------------------------------
-# HEARTBEAT
-# ---------------------------------
+
+def is_valid(field, value):
+
+    if field == "motion":
+        return isinstance(value, bool)
+
+    if not isinstance(value, (int, float)):
+        return False
+
+    if field not in LIMITS:
+        return False
+
+    low, high = LIMITS[field]
+    return low <= value <= high
+
 
 def heartbeat():
 
@@ -50,9 +70,6 @@ def heartbeat():
 
         time.sleep(10)
 
-# ---------------------------------
-# START HEARTBEAT
-# ---------------------------------
 
 threading.Thread(
     target=heartbeat,
@@ -63,17 +80,9 @@ print("===================================")
 print(" Smart Greenhouse Publisher Running")
 print("===================================")
 
-# ---------------------------------
-# MAIN LOOP
-# ---------------------------------
-
 while True:
 
     try:
-
-        # -----------------
-        # ANALOG SENSORS
-        # -----------------
 
         sound = grovepi.analogRead(
             SOUND_SENSOR
@@ -87,65 +96,46 @@ while True:
             MOISTURE_SENSOR
         )
 
-        # -----------------
-        # DHT SENSOR
-        # -----------------
-
         temp, humidity = grovepi.dht(
             TEMP_SENSOR,
             0
         )
 
-        # -----------------
-        # PIR
-        # -----------------
-
         motion = grovepi.digitalRead(
             PIR_SENSOR
         )
 
-        # -----------------
-        # VALIDATE DHT
-        # -----------------
-
-        if temp == -1 or humidity == -1:
-
-            print(
-                "DHT Read Failed"
-            )
-
-            time.sleep(2)
-
-            continue
-
-        # -----------------
-        # PAYLOAD
-        # -----------------
-
         payload = {
-
-            "temperature":
-            round(temp, 2),
-
-            "humidity":
-            round(humidity, 2),
-
-            "light":
-            light,
-
-            "sound":
-            sound,
-
-            "moisture":
-            moisture,
-
-            "motion":
-            bool(motion),
-
-            "timestamp":
-            time.time()
-
+            "timestamp": time.time()
         }
+
+        if is_valid("sound", sound):
+            payload["sound"] = sound
+
+        if is_valid("light", light):
+            payload["light"] = light
+
+        if is_valid("moisture", moisture):
+            payload["moisture"] = moisture
+
+        payload["motion"] = bool(motion)
+
+        if temp != -1 and humidity != -1:
+            temp = round(temp, 2)
+            humidity = round(humidity, 2)
+
+            if is_valid("temperature", temp):
+                payload["temperature"] = temp
+
+            if is_valid("humidity", humidity):
+                payload["humidity"] = humidity
+        else:
+            print("DHT Read Failed - publishing analog sensors only")
+
+        if len(payload) <= 1:
+            print("No valid sensor readings")
+            time.sleep(2)
+            continue
 
         print(
             json.dumps(
@@ -153,10 +143,6 @@ while True:
                 indent=2
             )
         )
-
-        # -----------------
-        # MQTT PUBLISH
-        # -----------------
 
         client.publish(
             "greenhouse/sensors",
