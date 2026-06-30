@@ -11,6 +11,7 @@ PDDL_FILE = os.path.join(
 def generate_problem(context):
 
     init = []
+    goal = []
 
     # -----------------------------
     # LIGHT
@@ -18,6 +19,7 @@ def generate_problem(context):
 
     if context["light"] == "LOW":
         init.append("(light-low)")
+        goal.append("(led-on)")
     else:
         init.append("(light-normal)")
 
@@ -27,6 +29,7 @@ def generate_problem(context):
 
     if context["temperature"] == "HOT":
         init.append("(temperature-high)")
+        goal.append("(fan-on)")
     else:
         init.append("(temperature-normal)")
 
@@ -36,58 +39,26 @@ def generate_problem(context):
 
     if context["soil"] == "DRY":
         init.append("(soil-dry)")
+        goal.append("(pump-on)")
     else:
         init.append("(soil-normal)")
 
     # -----------------------------
-    # DEVICE STATES
+    # WRITE PROBLEM FILE
     # -----------------------------
 
-    #
-    # Initially assume everything OFF
-    #
-
-    # Nothing is written here because
-    # under the Closed World Assumption
-    # predicates not listed are FALSE.
-
-    # -----------------------------
-    # GOAL
-    # -----------------------------
-
-    goal = []
-
-    #
-    # We always want
-    #
-
-    goal.append("(led-on)")
-    goal.append("(not (fan-on))")
-    goal.append("(not (pump-on))")
-
-    # -----------------------------
-    # WRITE FILE
-    # -----------------------------
-
-    text = f"""
-(define (problem greenhouse-problem)
+    text = f"""(define (problem greenhouse-problem)
 
     (:domain smart-greenhouse)
 
     (:init
-
         {' '.join(init)}
-
     )
 
     (:goal
-
         (and
-
             {' '.join(goal)}
-
         )
-
     )
 
 )
@@ -99,20 +70,12 @@ def generate_problem(context):
     return text
 
 
-# ----------------------------------------------------
-# TEST
-# ----------------------------------------------------
-
 if __name__ == "__main__":
 
     context = {
-
         "light": "LOW",
-
         "temperature": "HOT",
-
         "soil": "DRY"
-
     }
 
     print(generate_problem(context))
