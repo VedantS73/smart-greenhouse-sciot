@@ -1,86 +1,94 @@
 #!/usr/bin/env python3
 
+import subprocess
 import os
-import requests
 
-DOMAIN_FILE = os.path.join(
-    os.path.dirname(__file__),
+BASE = os.path.dirname(__file__)
+
+DOMAIN = os.path.join(
+    BASE,
     "../pddl/domain.pddl"
 )
 
-PROBLEM_FILE = os.path.join(
-    os.path.dirname(__file__),
+PROBLEM = os.path.join(
+    BASE,
     "../pddl/problem.pddl"
 )
 
-SOLVER_URL = "https://solver.planning.domains/solve"
+PLAN_FILE = os.path.join(
+    BASE,
+    "plan.soln"
+)
 
 
 def run_planner():
 
-    # -------------------------
-    # Read PDDL files
-    # -------------------------
+    if os.path.exists(PLAN_FILE):
+        os.remove(PLAN_FILE)
 
-    with open(DOMAIN_FILE, "r") as f:
-        domain = f.read()
-
-    with open(PROBLEM_FILE, "r") as f:
-        problem = f.read()
-
-    payload = {
-        "domain": domain,
-        "problem": problem
-    }
+    command = [
+        "python3",
+        "-m",
+        "pyperplan",
+        DOMAIN,
+        PROBLEM
+    ]
 
     try:
 
-        response = requests.post(
-            SOLVER_URL,
-            json=payload,
-            timeout=30
+        subprocess.run(
+            command,
+            check=True
         )
 
-        response.raise_for_status()
-
-        result = response.json()
-
-    except Exception as e:
-
-        print("Planner request failed:")
-        print(e)
-        return []
-
-    # -------------------------
-    # Check planner response
-    # -------------------------
-
-    if result.get("status") != "ok":
+    except subprocess.CalledProcessError:
 
         print("Planning failed")
-        print(result)
+
         return []
 
-    plan = []
+    #
+    # Find generated plan
+    #
 
-    planner_result = result.get("result", {})
+    if not os.path.exists("sas_plan"):
 
-    for action in planner_result.get("plan", []):
+        print("No plan generated")
 
-        if "name" in action:
-            plan.append(action["name"])
+        return []
 
-        elif "action" in action:
-            plan.append(action["action"])
+    actions = []
 
-    return plan
+    with open("sas_plan") as f:
+
+        for line in f:
+
+            line = line.strip()
+
+            if not line:
+                continue
+
+            if line.startswith(";"):
+                continue
+
+            actions.append(
+                line.replace("(", "")
+                    .replace(")", "")
+            )
+
+    return actions
 
 
 if __name__ == "__main__":
 
-    actions = run_planner()
+    plan = run_planner()
 
-    print("\nReturned Plan\n")
+    print()
 
-    for action in actions:
+    print("Returned plan")
+
+    print("----------------")
+
+    for action in plan:
+
         print(action)
