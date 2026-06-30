@@ -2,17 +2,20 @@
 
     (:domain smart-greenhouse)
 
-    (:objects
-    )
-
     (:init
-        (low-light)
+
+        (light-low)
+
     )
 
     (:goal
+
         (and
+
             (led-on)
+
         )
+
     )
 
 )
