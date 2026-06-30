@@ -5,24 +5,14 @@ import os
 
 BASE = os.path.dirname(__file__)
 
-DOMAIN = os.path.join(
-    BASE,
-    "../pddl/domain.pddl"
-)
-
-PROBLEM = os.path.join(
-    BASE,
-    "../pddl/problem.pddl"
-)
-
-PLAN_FILE = os.path.join(
-    BASE,
-    "plan.soln"
-)
+DOMAIN = os.path.join(BASE, "../pddl/domain.pddl")
+PROBLEM = os.path.join(BASE, "../pddl/problem.pddl")
+PLAN_FILE = PROBLEM + ".soln"
 
 
 def run_planner():
 
+    # Remove old plan
     if os.path.exists(PLAN_FILE):
         os.remove(PLAN_FILE)
 
@@ -35,31 +25,19 @@ def run_planner():
     ]
 
     try:
-
-        subprocess.run(
-            command,
-            check=True
-        )
+        subprocess.run(command, check=True)
 
     except subprocess.CalledProcessError:
-
         print("Planning failed")
-
         return []
 
-    #
-    # Find generated plan
-    #
-
-    if not os.path.exists("sas_plan"):
-
-        print("No plan generated")
-
+    if not os.path.exists(PLAN_FILE):
+        print("Plan file not found")
         return []
 
     actions = []
 
-    with open("sas_plan") as f:
+    with open(PLAN_FILE, "r") as f:
 
         for line in f:
 
@@ -83,12 +61,8 @@ if __name__ == "__main__":
 
     plan = run_planner()
 
-    print()
-
-    print("Returned plan")
-
+    print("\nReturned Plan")
     print("----------------")
 
     for action in plan:
-
         print(action)
