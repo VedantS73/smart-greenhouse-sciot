@@ -8,79 +8,87 @@ PDDL_FILE = os.path.join(
 )
 
 
-def generate_problem(context, goal):
+def generate_problem(context):
 
-    predicates = []
+    init = []
 
-    # ----------------------------
+    # -----------------------------
     # LIGHT
-    # ----------------------------
+    # -----------------------------
 
     if context["light"] == "LOW":
-        predicates.append("(low-light)")
+        init.append("(light-low)")
+    else:
+        init.append("(light-normal)")
 
-    elif context["light"] == "HIGH":
-        predicates.append("(adequate-light)")
-
-    # ----------------------------
+    # -----------------------------
     # TEMPERATURE
-    # ----------------------------
+    # -----------------------------
 
     if context["temperature"] == "HOT":
-        predicates.append("(high-temperature)")
-
+        init.append("(temperature-high)")
     else:
-        predicates.append("(normal-temperature)")
+        init.append("(temperature-normal)")
 
-    # ----------------------------
+    # -----------------------------
     # SOIL
-    # ----------------------------
+    # -----------------------------
 
     if context["soil"] == "DRY":
-        predicates.append("(low-moisture)")
-
+        init.append("(soil-dry)")
     else:
-        predicates.append("(adequate-moisture)")
+        init.append("(soil-normal)")
 
-    # ----------------------------
-    # MOTION
-    # ----------------------------
+    # -----------------------------
+    # DEVICE STATES
+    # -----------------------------
 
-    if context["motion"] == "DETECTED":
-        predicates.append("(motion-detected)")
+    #
+    # Initially assume everything OFF
+    #
 
-    # ----------------------------
-    # GOALS
-    # ----------------------------
+    # Nothing is written here because
+    # under the Closed World Assumption
+    # predicates not listed are FALSE.
 
-    goals = []
+    # -----------------------------
+    # GOAL
+    # -----------------------------
 
-    if goal["light"] == "NORMAL":
-        goals.append("(led-on)")
+    goal = []
 
-    if goal["temperature"] == "NORMAL":
-        goals.append("(fan-on)")
+    #
+    # We always want
+    #
 
-    # ----------------------------
+    goal.append("(led-on)")
+    goal.append("(not (fan-on))")
+    goal.append("(not (pump-on))")
+
+    # -----------------------------
     # WRITE FILE
-    # ----------------------------
+    # -----------------------------
 
-    text = f"""(define (problem greenhouse-problem)
+    text = f"""
+(define (problem greenhouse-problem)
 
-(:domain smart-greenhouse)
+    (:domain smart-greenhouse)
 
-(:objects
-)
+    (:init
 
-(:init
-    {' '.join(predicates)}
-)
+        {' '.join(init)}
 
-(:goal
-    (and
-        {' '.join(goals)}
     )
-)
+
+    (:goal
+
+        (and
+
+            {' '.join(goal)}
+
+        )
+
+    )
 
 )
 """
@@ -88,26 +96,23 @@ def generate_problem(context, goal):
     with open(PDDL_FILE, "w") as f:
         f.write(text)
 
-    print("\nGenerated problem.pddl")
-    print(text)
+    return text
 
 
-# -------------------------------------------------------
-# Test
-# -------------------------------------------------------
+# ----------------------------------------------------
+# TEST
+# ----------------------------------------------------
 
 if __name__ == "__main__":
 
     context = {
+
         "light": "LOW",
+
         "temperature": "HOT",
-        "soil": "DRY",
-        "motion": "NONE"
+
+        "soil": "DRY"
+
     }
 
-    goal = {
-        "light": "NORMAL",
-        "temperature": "NORMAL"
-    }
-
-    generate_problem(context, goal)
+    print(generate_problem(context))
