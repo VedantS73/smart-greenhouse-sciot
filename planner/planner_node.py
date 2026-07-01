@@ -4,6 +4,9 @@ import json
 import time
 import threading
 import paho.mqtt.client as mqtt
+from generate_problem import generate_problem
+from run_planner import run_planner
+from plan_parser import plan_to_actions
 
 BROKER = "localhost"
 
@@ -198,42 +201,6 @@ def get_goal():
 # PLANNER
 # ---------------------------------
 
-def generate_plan(context):
-
-    actions = {}
-
-    # LED
-
-    if context["light"] == "LOW":
-
-        actions["led"] = True
-
-    else:
-
-        actions["led"] = False
-
-    # Relay1 (Fan)
-
-    if context["temperature"] == "HOT":
-
-        actions["relay1"] = True
-
-    else:
-
-        actions["relay1"] = False
-
-    # Relay2 (Pump)
-
-    if context["soil"] == "DRY":
-
-        actions["relay2"] = True
-
-    else:
-
-        actions["relay2"] = False
-
-    return actions
-
 # ---------------------------------
 # ACTUATOR STATUS
 # ---------------------------------
@@ -302,16 +269,31 @@ def on_message(client, userdata, msg):
             msg.payload.decode()
         )
 
-        context = get_context(
-            sensor_data
-        )
-
+        context = get_context(sensor_data)
         goal = get_goal()
+        # ---------------------------------
+        # Generate PDDL problem
+        # ---------------------------------
+        problem = generate_problem(context)
 
-        actions = generate_plan(
-            context
-        )
+        print("\n===================================")
+        print("Generated Problem")
+        print(problem)
 
+        # ---------------------------------
+        # Run AI Planner
+        # ---------------------------------
+
+        plan = run_planner()
+
+        print("\nReturned Plan")
+        print(plan)
+
+        # ---------------------------------
+        # Convert planner output
+        # ---------------------------------
+
+        actions = plan_to_actions(plan)
         print("\n===================================")
         print("Current Context")
         print(context)
@@ -319,11 +301,12 @@ def on_message(client, userdata, msg):
         print("\nGoal State")
         print(goal)
 
-        print("\nPlanner Actions")
+        print("\nMQTT Actions")
         print(actions)
 
         print("\nAuto Mode")
         print(AUTO_MODE)
+        print("===================================")
 
         if AUTO_MODE:
 
