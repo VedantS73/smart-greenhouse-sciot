@@ -19,6 +19,7 @@ current_state = {
 }
 
 AUTO_MODE = True
+last_context = None
 
 # ---------------------------------
 # HEARTBEAT
@@ -270,6 +271,15 @@ def on_message(client, userdata, msg):
         )
 
         context = get_context(sensor_data)
+
+        global last_context
+        #
+        # Replan only if context changes
+        #
+        if context == last_context:
+            print("\nNo context change - planner not executed.")
+            return
+        last_context = context.copy()
         goal = get_goal()
         # ---------------------------------
         # Generate PDDL problem
