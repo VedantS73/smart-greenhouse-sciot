@@ -14,7 +14,7 @@ const emptySensors = {
 function App() {
   const [data, setData] = useState({
     sensors: emptySensors,
-    actuators: { led: false, relay1: false, relay2: false },
+    actuators: { led: false, relay1: false, relay2: false, relay3: false, buzzer: false },
     planner: { context: {}, goal: {}, actions: {}, auto_mode: true, action_mismatch: {} },
     health: {},
     history: { temperature: [], humidity: [], light: [] },
@@ -73,7 +73,7 @@ function App() {
     });
 
     s.on('actuator_ack', ({ device }) => {
-      const labels = { led: 'LED', relay1: 'Fan', relay2: 'Pump' };
+      const labels = { led: 'LED', relay1: 'Fan', relay2: 'Pump', relay3: 'GrowLight' };
       message.success(`${labels[device] || device} confirmed`);
       setActuatorFeedback((prev) => ({
         ...prev,
@@ -94,7 +94,7 @@ function App() {
         hardware_mismatch: 'Hardware state mismatch',
         auto_mode_active: 'Switch to MANUAL mode first'
       };
-      const labels = { led: 'LED', relay1: 'Fan', relay2: 'Pump' };
+      const labels = { led: 'LED', relay1: 'Fan', relay2: 'Pump', relay3: 'GrowLight' };
       message.error(`${labels[device] || device}: ${messages[reason] || 'Command failed'}`);
       setActuatorFeedback((prev) => ({
         ...prev,

@@ -14,8 +14,10 @@ client = mqtt.Client()
 
 current_state = {
     "led": False,
+    "buzzer": False,
     "relay1": False,
-    "relay2": False
+    "relay2": False,
+    "relay3": False
 }
 
 AUTO_MODE = True
@@ -210,7 +212,7 @@ def update_actuator_state(payload):
 
     global current_state
 
-    current_state = payload
+    current_state.update(payload)
 
 # ---------------------------------
 # MQTT CALLBACK

@@ -11,7 +11,9 @@ const { Text } = Typography;
 const ACTUATORS = [
   { id: 'led', icon: BulbOutlined, label: 'LED', color: '#fbbf24' },
   { id: 'relay1', icon: ThunderboltOutlined, label: 'Fan', color: '#f87171' },
-  { id: 'relay2', icon: DropboxOutlined, label: 'Pump', color: '#06b6d4' }
+  { id: 'relay2', icon: DropboxOutlined, label: 'Pump', color: '#06b6d4' },
+  { id: 'relay3', icon: BulbOutlined, label: 'GrowLight', color: '#fbbf24' },
+  { id: 'buzzer', icon: ThunderboltOutlined, label: 'Buzzer', color: '#f87171' }
 ];
 
 function ActuatorPanel({

@@ -23,7 +23,8 @@ sensor_data = {
 actuator_state = {
     "led": False,
     "relay1": False,
-    "relay2": False
+    "relay2": False,
+    "relay3": False
 }
 
 planner_data = {
@@ -258,6 +259,12 @@ def api_status():
             False
         ),
 
+        "relay3":
+        actuator_state.get(
+            "relay3",
+            False
+        ),
+
         "health":
         greenhouse_health(),
 
@@ -348,6 +355,26 @@ def toggle_relay2():
             "relay2":
             not actuator_state.get(
                 "relay2",
+                False
+            )
+        })
+    )
+
+    return "ok"
+
+@app.route("/toggle_relay3")
+def toggle_relay3():
+
+    if mode != "MANUAL":
+
+        return "AUTO MODE ACTIVE"
+
+    publisher.publish(
+        "greenhouse/actions",
+        json.dumps({
+            "relay3":
+            not actuator_state.get(
+                "relay3",
                 False
             )
         })

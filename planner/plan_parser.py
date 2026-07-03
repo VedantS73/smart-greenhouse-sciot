@@ -4,8 +4,10 @@ def plan_to_actions(plan):
 
     actions = {
         "led": False,
+        "buzzer": False,
         "relay1": False,
-        "relay2": False
+        "relay2": False,
+        "relay3": False,
     }
 
     for action in plan:
@@ -13,10 +15,10 @@ def plan_to_actions(plan):
         action = action.lower().strip()
 
         if action == "turn-on-led":
-            actions["led"] = True
+            actions["relay3"] = True
 
         elif action == "turn-off-led":
-            actions["led"] = False
+            actions["relay3"] = False
 
         elif action == "turn-on-fan":
             actions["relay1"] = True

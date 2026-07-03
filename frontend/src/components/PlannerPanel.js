@@ -14,9 +14,11 @@ import { InfoCircleOutlined, WarningOutlined } from '@ant-design/icons';
 const { Text } = Typography;
 
 const DEVICE_LABELS = {
-  led: 'LED',
+  //led: 'LED',
   relay1: 'Fan',
-  relay2: 'Pump'
+  relay2: 'Pump',
+  relay3: 'GrowLight',
+  //buzzer: 'Buzzer'
 };
 
 const STATUS_COLORS = {

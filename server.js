@@ -36,7 +36,7 @@ const mqttClient = mqtt.connect(`mqtt://${BROKER}:${MQTT_PORT}`);
 let sensorData = {};
 let sensorMeta = createEmptySensorMeta();
 let lastSeen = {};
-let actuatorState = { led: false, relay1: false, relay2: false };
+let actuatorState = { led: false, buzzer: false, relay1: false, relay2: false, relay3: false };
 let plannerData = {
   context: {},
   goal: {},
@@ -47,7 +47,8 @@ let plannerData = {
 let serviceHealth = {
   publisher: { online: false, lastHeartbeat: null },
   actuator: { online: false, lastHeartbeat: null },
-  planner: { online: false, lastHeartbeat: null }
+  planner: { online: false, lastHeartbeat: null },
+  security: { online: false, lastHeartbeat: null }
 };
 let eventLog = [];
 let sensorHistory = {
@@ -85,14 +86,17 @@ function computeActionMismatch() {
   const actions = plannerData.actions || {};
   const mismatch = {};
 
-  if ('led' in actions && Boolean(actions.led) !== Boolean(actuatorState.led)) {
-    mismatch.led = true;
-  }
+  //if ('led' in actions && Boolean(actions.led) !== Boolean(actuatorState.led)) {
+  //  mismatch.led = true;
+  //}
   if ('relay1' in actions && Boolean(actions.relay1) !== Boolean(actuatorState.relay1)) {
     mismatch.relay1 = true;
   }
   if ('relay2' in actions && Boolean(actions.relay2) !== Boolean(actuatorState.relay2)) {
     mismatch.relay2 = true;
+  }
+  if ('relay3' in actions && Boolean(actions.relay3) !== Boolean(actuatorState.relay3)) {
+    mismatch.relay3 = true;
   }
 
   return mismatch;
@@ -342,6 +346,8 @@ io.on('connection', (socket) => {
   socket.on('toggle_led', (state) => handleToggle('led', state));
   socket.on('toggle_relay1', (state) => handleToggle('relay1', state));
   socket.on('toggle_relay2', (state) => handleToggle('relay2', state));
+  socket.on('toggle_relay3', (state) => handleToggle('relay3', state));
+  socket.on('toggle_buzzer', (state) => handleToggle('buzzer', state));
 
   socket.on('set_mode', (mode) => {
     const target = mode === 'auto' ? 'AUTO' : 'MANUAL';

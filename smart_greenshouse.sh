@@ -15,6 +15,7 @@ fi
 pkill -f publisher.py 2>/dev/null || true
 pkill -f actuator_subscriber.py 2>/dev/null || true
 pkill -f planner_node.py 2>/dev/null || true
+pkill -f security_node.py 2>/dev/null || true
 pkill -f dashboard.py 2>/dev/null || true
 pkill -f "node server.js" 2>/dev/null || true
 
@@ -39,6 +40,9 @@ nohup python3 "$SCRIPT_DIR/actuator_node/actuator_subscriber.py" \
 
 nohup python3 "$SCRIPT_DIR/planner/planner_node.py" \
     > "$SCRIPT_DIR/logs/planner.log" 2>&1 &
+
+nohup python3 "$SCRIPT_DIR/security_node/security_node.py" \
+    > "$SCRIPT_DIR/logs/security.log" 2>&1 &
 
 nohup node "$SCRIPT_DIR/server.js" \
     > "$SCRIPT_DIR/logs/server.log" 2>&1 &
