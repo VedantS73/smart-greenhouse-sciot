@@ -16,7 +16,9 @@
 
         (soil-dry)
         (soil-normal)
-
+        
+        (daytime)
+        (nighttime)
         ;; ============================================
         ;; Device State
         ;; ============================================
@@ -35,7 +37,10 @@
         :parameters ()
 
         :precondition
-            (light-low)
+            (and
+                (light-low)
+                (daytime)
+            )
 
         :effect
             (led-on)

@@ -13,6 +13,15 @@ def generate_problem(context):
     init = []
     goal = []
 
+
+    from datetime import datetime
+
+    hour = datetime.now().hour
+
+    if 6 <= hour < 22:
+        init.append("(daytime)")
+    else:
+        init.append("(nighttime)")
     # -----------------------------
     # LIGHT
     # -----------------------------
