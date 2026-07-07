@@ -14,6 +14,9 @@
         (temperature-high)
         (temperature-normal)
 
+        (humidity-high)
+        (humidity-normal)
+
         (soil-dry)
         (soil-normal)
         
@@ -82,12 +85,26 @@
         :precondition
             (and
                 (temperature-normal)
+                (humidity-normal)
                 (fan-on)
             )
 
         :effect
             (not (fan-on))
     )
+
+    (:action turn-on-fan-humidity
+
+        :parameters ()
+
+        :precondition
+            (humidity-high)
+
+        :effect
+            (fan-on)
+    )
+
+
 
     ;; ============================================
     ;; PUMP

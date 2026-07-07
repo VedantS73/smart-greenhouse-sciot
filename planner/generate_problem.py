@@ -43,6 +43,16 @@ def generate_problem(context):
         init.append("(temperature-normal)")
 
     # -----------------------------
+    # HUMIDITY
+    # -----------------------------
+
+    if context["humidity"] == "HIGH":
+        init.append("(humidity-high)")
+        goal.append("(fan-on)")
+    else:
+        init.append("(humidity-normal)")
+
+    # -----------------------------
     # SOIL
     # -----------------------------
 
