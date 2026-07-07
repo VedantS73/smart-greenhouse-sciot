@@ -3,19 +3,13 @@
     (:domain smart-greenhouse)
 
     (:init
-
-        (light-low)
-
+        (nighttime) (light-normal) (temperature-normal) (humidity-high) (soil-normal)
     )
 
     (:goal
-
         (and
-
-            (led-on)
-
+            (fan-on)
         )
-
     )
 
 )

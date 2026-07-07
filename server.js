@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const os = require('os');
+const fs = require('fs');
 const socketIo = require('socket.io');
 const mqtt = require('mqtt');
 const cors = require('cors');
@@ -13,6 +14,14 @@ const {
   validateSensorPayload,
   createEmptySensorMeta
 } = require('./shared/sensorLimits');
+
+const {
+  DEFAULT_RULES,
+  validateRules,
+  normalizeRules
+} = require('./shared/rulesDefaults');
+
+const RULES_FILE = path.join(__dirname, 'config', 'rules.json');
 
 const app = express();
 const server = http.createServer(app);
@@ -59,6 +68,62 @@ let sensorHistory = {
 
 const pendingCommands = new Map();
 let commandCounter = 0;
+let rulesConfig = { ...DEFAULT_RULES };
+
+function loadRulesFromDisk() {
+  try {
+    if (fs.existsSync(RULES_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(RULES_FILE, 'utf8'));
+      const result = validateRules(raw);
+      if (result.valid) {
+        rulesConfig = result.rules;
+        return rulesConfig;
+      }
+      console.warn('Invalid rules.json on disk, using defaults:', result.error);
+    }
+  } catch (err) {
+    console.warn('Failed to load rules.json, using defaults:', err.message);
+  }
+
+  rulesConfig = normalizeRules(DEFAULT_RULES);
+  saveRulesToDisk(rulesConfig);
+  return rulesConfig;
+}
+
+function saveRulesToDisk(rules) {
+  const dir = path.dirname(RULES_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(RULES_FILE, JSON.stringify(rules, null, 2) + '\n');
+}
+
+function publishRulesConfig(rules) {
+  mqttClient.publish('greenhouse/config', JSON.stringify(rules));
+}
+
+function applyRulesUpdate(rules, socket) {
+  const result = validateRules(rules);
+  if (!result.valid) {
+    if (socket) {
+      socket.emit('rules_nack', { reason: result.error });
+    }
+    return false;
+  }
+
+  rulesConfig = result.rules;
+  saveRulesToDisk(rulesConfig);
+  publishRulesConfig(rulesConfig);
+  io.emit('rules_update', rulesConfig);
+
+  if (socket) {
+    socket.emit('rules_ack', { rules: rulesConfig });
+  }
+
+  return true;
+}
+
+loadRulesFromDisk();
 
 function nowSec() {
   return Date.now() / 1000;
@@ -224,7 +289,8 @@ function getInitialData() {
     },
     health: serviceHealth,
     history: sensorHistory,
-    events: eventLog
+    events: eventLog,
+    rules: rulesConfig
   };
 }
 
@@ -327,6 +393,10 @@ app.get('/api/history', (req, res) => {
   res.json(sensorHistory);
 });
 
+app.get('/api/rules', (req, res) => {
+  res.json(rulesConfig);
+});
+
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`);
   socket.emit('initial_data', getInitialData());
@@ -355,6 +425,10 @@ io.on('connection', (socket) => {
       'greenhouse/mode',
       JSON.stringify({ mode: target })
     );
+  });
+
+  socket.on('update_rules', (rules) => {
+    applyRulesUpdate(rules, socket);
   });
 
   socket.on('disconnect', () => {

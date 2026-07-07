@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
 
+import os
+import sys
+
+sys.path.insert(
+    0,
+    os.path.join(
+        os.path.dirname(__file__),
+        ".."
+    )
+)
+
 import json
 import time
 import threading
 import paho.mqtt.client as mqtt
+from shared.rules_config import load_rules, apply_rules_update
 
 BROKER = "localhost"
 
-LIGHT_THRESHOLD = 200
-CRITICAL_TEMP = 40
+RULES = load_rules()
 
 client = mqtt.Client()
 
@@ -86,6 +97,53 @@ def publish_alarm(led, buzzer):
 
 
 # ---------------------------------
+# SENSOR EVALUATION
+# ---------------------------------
+
+def evaluate_sensor_data(data):
+
+    security = RULES["security"]
+
+    light = data.get("light", 1023)
+    motion = data.get("motion", False)
+    temperature = data.get("temperature", 25)
+
+    intrusion = (
+        motion and
+        light < security["intrusionLightBelow"]
+    )
+
+    overheat = (
+        temperature > security["criticalTempAbove"]
+    )
+
+    if intrusion:
+
+        print("\nSECURITY: Night intrusion detected")
+
+        publish_alarm(
+            True,
+            True
+        )
+
+    elif overheat:
+
+        print("\nSECURITY: Critical temperature")
+
+        publish_alarm(
+            True,
+            True
+        )
+
+    else:
+
+        publish_alarm(
+            False,
+            False
+        )
+
+
+# ---------------------------------
 # MQTT CALLBACK
 # ---------------------------------
 
@@ -93,47 +151,26 @@ def on_message(client, userdata, msg):
 
     try:
 
+        if msg.topic == "greenhouse/config":
+
+            global RULES
+
+            payload = json.loads(
+                msg.payload.decode()
+            )
+
+            RULES = apply_rules_update(payload)
+
+            print("\nSecurity rules updated:")
+            print(json.dumps(RULES["security"], indent=2))
+
+            return
+
         data = json.loads(
             msg.payload.decode()
         )
 
-        light = data.get("light", 1023)
-        motion = data.get("motion", False)
-        temperature = data.get("temperature", 25)
-
-        intrusion = (
-            motion and
-            light < LIGHT_THRESHOLD
-        )
-
-        overheat = (
-            temperature > CRITICAL_TEMP
-        )
-
-        if intrusion:
-
-            print("\nSECURITY: Night intrusion detected")
-
-            publish_alarm(
-                True,
-                True
-            )
-
-        elif overheat:
-
-            print("\nSECURITY: Critical temperature")
-
-            publish_alarm(
-                True,
-                True
-            )
-
-        else:
-
-            publish_alarm(
-                False,
-                False
-            )
+        evaluate_sensor_data(data)
 
     except Exception as e:
 
@@ -157,6 +194,10 @@ client.connect(
 
 client.subscribe(
     "greenhouse/sensors"
+)
+
+client.subscribe(
+    "greenhouse/config"
 )
 
 

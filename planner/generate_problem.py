@@ -8,20 +8,34 @@ PDDL_FILE = os.path.join(
 )
 
 
-def generate_problem(context):
+def generate_problem(context, rules=None):
 
     init = []
     goal = []
-
 
     from datetime import datetime
 
     hour = datetime.now().hour
 
-    if 6 <= hour < 22:
+    schedule = (
+        rules["schedule"]
+        if rules
+        else {"dayStartHour": 6, "dayEndHour": 22}
+    )
+
+    day_start = schedule["dayStartHour"]
+    day_end = schedule["dayEndHour"]
+
+    if day_start < day_end:
+        is_daytime = day_start <= hour < day_end
+    else:
+        is_daytime = hour >= day_start or hour < day_end
+
+    if is_daytime:
         init.append("(daytime)")
     else:
         init.append("(nighttime)")
+
     # -----------------------------
     # LIGHT
     # -----------------------------
@@ -46,7 +60,7 @@ def generate_problem(context):
     # HUMIDITY
     # -----------------------------
 
-    if context["humidity"] == "HIGH":
+    if context["humidity"] == "WET":
         init.append("(humidity-high)")
         goal.append("(fan-on)")
     else:
@@ -94,7 +108,8 @@ if __name__ == "__main__":
     context = {
         "light": "LOW",
         "temperature": "HOT",
-        "soil": "DRY"
+        "soil": "DRY",
+        "humidity": "NORMAL"
     }
 
     print(generate_problem(context))

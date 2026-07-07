@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
 
+import os
+import sys
+
+sys.path.insert(
+    0,
+    os.path.join(
+        os.path.dirname(__file__),
+        ".."
+    )
+)
+
 import json
 import time
 import threading
@@ -7,6 +18,7 @@ import paho.mqtt.client as mqtt
 from generate_problem import generate_problem
 from run_planner import run_planner
 from plan_parser import plan_to_actions
+from shared.rules_config import load_rules, apply_rules_update
 
 BROKER = "localhost"
 
@@ -22,6 +34,8 @@ current_state = {
 
 AUTO_MODE = True
 last_context = None
+last_sensor_data = None
+RULES = load_rules()
 
 # ---------------------------------
 # HEARTBEAT
@@ -67,6 +81,9 @@ def publish_planner_status(
             "auto_mode":
             AUTO_MODE,
 
+            "rules":
+            RULES,
+
             "timestamp":
             time.time()
 
@@ -106,15 +123,20 @@ def get_context(data):
         False
     )
 
+    temp_rules = RULES["temperature"]
+    humidity_rules = RULES["humidity"]
+    light_rules = RULES["light"]
+    soil_rules = RULES["soil"]
+
     # -----------------
     # LIGHT
     # -----------------
 
-    if light < 200:
+    if light < light_rules["lowBelow"]:
 
         context["light"] = "LOW"
 
-    elif light > 350:
+    elif light > light_rules["highAbove"]:
 
         context["light"] = "HIGH"
 
@@ -126,11 +148,11 @@ def get_context(data):
     # TEMPERATURE
     # -----------------
 
-    if temp > 30:
+    if temp > temp_rules["hotAbove"]:
 
         context["temperature"] = "HOT"
 
-    elif temp < 20:
+    elif temp < temp_rules["coldBelow"]:
 
         context["temperature"] = "COLD"
 
@@ -142,11 +164,11 @@ def get_context(data):
     # HUMIDITY
     # -----------------
 
-    if humidity < 40:
+    if humidity < humidity_rules["dryBelow"]:
 
         context["humidity"] = "DRY"
 
-    elif humidity > 70:
+    elif humidity > humidity_rules["wetAbove"]:
 
         context["humidity"] = "WET"
 
@@ -158,11 +180,11 @@ def get_context(data):
     # SOIL
     # -----------------
 
-    if moisture > 650:
+    if moisture > soil_rules["wetAbove"]:
 
         context["soil"] = "WET"
 
-    elif moisture < 450:
+    elif moisture < soil_rules["dryBelow"]:
 
         context["soil"] = "DRY"
 
@@ -204,6 +226,58 @@ def get_goal():
 # PLANNER
 # ---------------------------------
 
+def run_planning_pipeline(sensor_data):
+
+    global last_context
+
+    context = get_context(sensor_data)
+
+    if context == last_context:
+        print("\nNo context change - planner not executed.")
+        return
+
+    last_context = context.copy()
+    goal = get_goal()
+
+    problem = generate_problem(context, RULES)
+
+    print("\n===================================")
+    print("Generated Problem")
+    print(problem)
+
+    plan = run_planner()
+
+    print("\nReturned Plan")
+    print(plan)
+
+    actions = plan_to_actions(plan)
+    print("\n===================================")
+    print("Current Context")
+    print(context)
+
+    print("\nGoal State")
+    print(goal)
+
+    print("\nMQTT Actions")
+    print(actions)
+
+    print("\nAuto Mode")
+    print(AUTO_MODE)
+    print("===================================")
+
+    if AUTO_MODE:
+
+        client.publish(
+            "greenhouse/actions",
+            json.dumps(actions)
+        )
+
+    publish_planner_status(
+        context,
+        goal,
+        actions
+    )
+
 # ---------------------------------
 # ACTUATOR STATUS
 # ---------------------------------
@@ -215,12 +289,30 @@ def update_actuator_state(payload):
     current_state.update(payload)
 
 # ---------------------------------
+# CONFIG UPDATE
+# ---------------------------------
+
+def handle_config_update(payload):
+
+    global RULES, last_context
+
+    RULES = apply_rules_update(payload)
+
+    print("\nRules updated:")
+    print(json.dumps(RULES, indent=2))
+
+    last_context = None
+
+    if last_sensor_data:
+        run_planning_pipeline(last_sensor_data)
+
+# ---------------------------------
 # MQTT CALLBACK
 # ---------------------------------
 
 def on_message(client, userdata, msg):
 
-    global AUTO_MODE
+    global AUTO_MODE, last_sensor_data
 
     try:
 
@@ -265,6 +357,20 @@ def on_message(client, userdata, msg):
             return
 
         # -----------------
+        # CONFIG UPDATE
+        # -----------------
+
+        if msg.topic == "greenhouse/config":
+
+            payload = json.loads(
+                msg.payload.decode()
+            )
+
+            handle_config_update(payload)
+
+            return
+
+        # -----------------
         # SENSOR DATA
         # -----------------
 
@@ -272,66 +378,9 @@ def on_message(client, userdata, msg):
             msg.payload.decode()
         )
 
-        context = get_context(sensor_data)
+        last_sensor_data = sensor_data.copy()
 
-        global last_context
-        #
-        # Replan only if context changes
-        #
-        if context == last_context:
-            print("\nNo context change - planner not executed.")
-            return
-        last_context = context.copy()
-        goal = get_goal()
-        # ---------------------------------
-        # Generate PDDL problem
-        # ---------------------------------
-        problem = generate_problem(context)
-
-        print("\n===================================")
-        print("Generated Problem")
-        print(problem)
-
-        # ---------------------------------
-        # Run AI Planner
-        # ---------------------------------
-
-        plan = run_planner()
-
-        print("\nReturned Plan")
-        print(plan)
-
-        # ---------------------------------
-        # Convert planner output
-        # ---------------------------------
-
-        actions = plan_to_actions(plan)
-        print("\n===================================")
-        print("Current Context")
-        print(context)
-
-        print("\nGoal State")
-        print(goal)
-
-        print("\nMQTT Actions")
-        print(actions)
-
-        print("\nAuto Mode")
-        print(AUTO_MODE)
-        print("===================================")
-
-        if AUTO_MODE:
-
-            client.publish(
-                "greenhouse/actions",
-                json.dumps(actions)
-            )
-
-        publish_planner_status(
-            context,
-            goal,
-            actions
-        )
+        run_planning_pipeline(sensor_data)
 
     except Exception as e:
 
@@ -362,6 +411,10 @@ client.subscribe(
 
 client.subscribe(
     "greenhouse/mode"
+)
+
+client.subscribe(
+    "greenhouse/config"
 )
 
 # ---------------------------------

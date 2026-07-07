@@ -14,7 +14,8 @@ import {
 import {
   ExperimentOutlined,
   UnorderedListOutlined,
-  ApiOutlined
+  ApiOutlined,
+  ControlOutlined
 } from '@ant-design/icons';
 import SensorPanel from './SensorPanel';
 import ActuatorPanel from './ActuatorPanel';
@@ -22,13 +23,15 @@ import HealthStatus from './HealthStatus';
 import ChartsPanel from './ChartsPanel';
 import PlannerPanel from './PlannerPanel';
 import EventLog from './EventLog';
+import RulesSetupModal from './RulesSetupModal';
 import './Dashboard.css';
 
 const { Header, Content, Footer } = Layout;
 const { Title, Text } = Typography;
 
-function Dashboard({ data, socket, connected, actuatorFeedback, setActuatorFeedback }) {
+function Dashboard({ data, socket, connected, actuatorFeedback, setActuatorFeedback, onRulesSaved }) {
   const [logOpen, setLogOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const autoMode = data.planner?.auto_mode !== false;
   const readings = data.sensors?.readings || {};
   const sensorMeta = data.sensors?.meta || {};
@@ -81,6 +84,13 @@ function Dashboard({ data, socket, connected, actuatorFeedback, setActuatorFeedb
               unCheckedChildren="Manual"
             />
           </Space>
+          <Tooltip title="Rules setup">
+            <Button
+              type="text"
+              icon={<ControlOutlined />}
+              onClick={() => setRulesOpen(true)}
+            />
+          </Tooltip>
           <Tooltip title="Activity log">
             <Badge count={eventCount} size="small" offset={[-2, 2]}>
               <Button
@@ -154,6 +164,15 @@ function Dashboard({ data, socket, connected, actuatorFeedback, setActuatorFeedb
       >
         <EventLog events={data.events} />
       </Drawer>
+
+      <RulesSetupModal
+        open={rulesOpen}
+        onClose={() => setRulesOpen(false)}
+        rules={data.rules}
+        readings={readings}
+        socket={socket}
+        onRulesSaved={onRulesSaved}
+      />
     </Layout>
   );
 }
