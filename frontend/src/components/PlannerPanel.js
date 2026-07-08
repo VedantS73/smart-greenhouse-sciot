@@ -17,7 +17,7 @@ const DEVICE_LABELS = {
   //led: 'LED',
   relay1: 'Fan',
   relay2: 'Pump',
-  relay3: 'GrowLight',
+  relay3: 'Grow Light',
   //buzzer: 'Buzzer'
 };
 

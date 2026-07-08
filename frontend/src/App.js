@@ -88,7 +88,7 @@ function App() {
     });
 
     s.on('actuator_ack', ({ device }) => {
-      const labels = { led: 'LED', relay1: 'Fan', relay2: 'Pump', relay3: 'GrowLight' };
+      const labels = { led: 'Alarm LED', relay1: 'Fan', relay2: 'Pump', relay3: 'Grow Light' };
       message.success(`${labels[device] || device} confirmed`);
       setActuatorFeedback((prev) => ({
         ...prev,
@@ -109,7 +109,7 @@ function App() {
         hardware_mismatch: 'Hardware state mismatch',
         auto_mode_active: 'Switch to MANUAL mode first'
       };
-      const labels = { led: 'LED', relay1: 'Fan', relay2: 'Pump', relay3: 'GrowLight' };
+      const labels = { led: 'Alarm LED', relay1: 'Fan', relay2: 'Pump', relay3: 'Grow Light' };
       message.error(`${labels[device] || device}: ${messages[reason] || 'Command failed'}`);
       setActuatorFeedback((prev) => ({
         ...prev,

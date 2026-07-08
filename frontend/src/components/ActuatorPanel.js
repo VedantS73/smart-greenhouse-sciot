@@ -1,19 +1,36 @@
 import React, { useState } from 'react';
 import { Card, Button, Tooltip, Typography, message } from 'antd';
 import {
-  BulbOutlined,
-  ThunderboltOutlined,
-  DropboxOutlined
+  AlertOutlined,
+  SoundOutlined,
+  SunOutlined
 } from '@ant-design/icons';
 
 const { Text } = Typography;
 
+function FanIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden>
+      <circle cx="12" cy="12" r="2" />
+      <path d="M12 4a1 1 0 0 1 .9.6 5.5 5.5 0 0 1 3.5 3.5A1 1 0 0 1 16 10h4a1 1 0 0 1 .4 1.9 5.5 5.5 0 0 1-3.5 3.5A1 1 0 0 1 16 18h-4a1 1 0 0 1-.9-.6 5.5 5.5 0 0 1-3.5-3.5A1 1 0 0 1 8 14H4a1 1 0 0 1-.4-1.9 5.5 5.5 0 0 1 3.5-3.5A1 1 0 0 1 8 6h4a1 1 0 0 1 .9-.6z" />
+    </svg>
+  );
+}
+
+function WaterDropIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden>
+      <path d="M12 2.69 17.66 8.35a6 6 0 1 1-8.49 0L12 2.69z" />
+    </svg>
+  );
+}
+
 const ACTUATORS = [
-  { id: 'led', icon: BulbOutlined, label: 'LED', color: '#fbbf24' },
-  { id: 'relay1', icon: ThunderboltOutlined, label: 'Fan', color: '#f87171' },
-  { id: 'relay2', icon: DropboxOutlined, label: 'Pump', color: '#06b6d4' },
-  { id: 'relay3', icon: BulbOutlined, label: 'GrowLight', color: '#fbbf24' },
-  { id: 'buzzer', icon: ThunderboltOutlined, label: 'Buzzer', color: '#f87171' }
+  { id: 'led', icon: AlertOutlined, label: 'Alarm LED', color: '#fbbf24' },
+  { id: 'relay1', icon: FanIcon, label: 'Fan', color: '#f87171' },
+  { id: 'relay2', icon: WaterDropIcon, label: 'Pump', color: '#06b6d4' },
+  { id: 'relay3', icon: SunOutlined, label: 'Grow Light', color: '#fbbf24' },
+  { id: 'buzzer', icon: SoundOutlined, label: 'Buzzer', color: '#f87171' }
 ];
 
 function ActuatorPanel({
