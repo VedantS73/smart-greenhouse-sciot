@@ -1,5 +1,7 @@
 import os
 import sys
+import signal
+import atexit
 
 sys.path.insert(
     0,
@@ -36,6 +38,7 @@ relay1_state = False
 relay2_state = False
 relay3_state = False
 buzzer_state = False
+_shutdown_started = False
 
 client = mqtt.Client()
 
@@ -81,6 +84,63 @@ def heartbeat():
         )
 
         time.sleep(10)
+
+
+def all_off(publish=True):
+
+    global led_state
+    global relay1_state
+    global relay2_state
+    global relay3_state
+    global buzzer_state
+
+    led_state = False
+    relay1_state = False
+    relay2_state = False
+    relay3_state = False
+    buzzer_state = False
+
+    grovepi.digitalWrite(get_actuator_port("led"), 0)
+    grovepi.digitalWrite(get_actuator_port("relay1"), 0)
+    grovepi.digitalWrite(get_actuator_port("relay2"), 0)
+    grovepi.digitalWrite(get_actuator_port("relay3"), 0)
+    grovepi.digitalWrite(get_actuator_port("buzzer"), 0)
+
+    if publish:
+        publish_status()
+        publish_event("Emergency shutdown: all actuators OFF")
+
+
+def shutdown_handler(signum, frame):
+
+    global _shutdown_started
+
+    if _shutdown_started:
+        return
+    _shutdown_started = True
+
+    print(f"\nReceived signal {signum}. Turning all actuators OFF...")
+
+    try:
+        all_off(publish=True)
+    except Exception as e:
+        print("Shutdown OFF sequence error:", e)
+
+    try:
+        client.loop_stop()
+        client.disconnect()
+    except Exception:
+        pass
+
+    raise SystemExit(0)
+
+
+def on_exit():
+
+    try:
+        all_off(publish=False)
+    except Exception:
+        pass
 
 
 def on_message(client, userdata, msg):
@@ -161,6 +221,11 @@ client.on_message = on_message
 client.connect(BROKER,1883,60)
 
 apply_pin_modes()
+all_off(publish=False)
+
+signal.signal(signal.SIGINT, shutdown_handler)
+signal.signal(signal.SIGTERM, shutdown_handler)
+atexit.register(on_exit)
 
 client.subscribe(
     "greenhouse/actions"
