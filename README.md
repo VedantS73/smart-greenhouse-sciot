@@ -39,8 +39,8 @@ Connect relays, LED, and buzzer to the ports below. Default mappings are stored 
 | Grove Pi port | Code name | Dashboard label | Used for |
 |---------------|-----------|-----------------|----------|
 | **D2** (port `2`) | `buzzer` | Buzzer | Security alarm sound |
-| **D3** (port `3`) | `relay1` | Fan | Ventilation (planner turns on when hot or humid) |
-| **D4** (port `4`) | `led` | LED | Security alarm indicator light |
+| **D4** (port `4`) | `relay1` | Fan | Ventilation (planner turns on when hot or humid) |
+| **D3** (port `3`) | `led` | LED | Security alarm indicator light |
 | **D5** (port `5`) | `relay2` | Pump | Water pump (planner turns on when soil is dry) |
 | **D6** (port `6`) | `relay3` | Grow Light | Grow light relay (planner turns on when light is low during daytime) |
 
@@ -48,15 +48,15 @@ Connect relays, LED, and buzzer to the ports below. Default mappings are stored 
 
 ```
 D2  →  Buzzer
-D3  →  Relay 1  →  Fan
-D4  →  LED       →  Alarm / status light
+D4  →  Relay 1  →  Fan
+D3  →  LED       →  Alarm / status light
 D5  →  Relay 2  →  Water pump
 D6  →  Relay 3  →  Grow light
 ```
 
 Actuator commands arrive on MQTT topic `greenhouse/actions`. The actuator node reports state back on `greenhouse/actuator_status`.
 
-> **Note:** The planner maps the PDDL action `turn-on-led` to **relay3 (Grow Light)**, not the standalone LED on D4. The LED on D4 and buzzer on D2 are mainly driven by the **security node** during intrusion or over-temperature alarms.
+> **Note:** The planner maps the PDDL action `turn-on-led` to **relay3 (Grow Light)**, not the standalone LED on D3. The LED on D3 and buzzer on D2 are mainly driven by the **security node** during intrusion or over-temperature alarms.
 
 ## Planner behavior (what triggers what)
 

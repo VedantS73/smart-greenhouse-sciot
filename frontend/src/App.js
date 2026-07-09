@@ -30,8 +30,8 @@ const defaultPorts = {
   },
   actuators: {
     buzzer: 2,
-    relay1: 3,
-    led: 4,
+    relay1: 4,
+    led: 3,
     relay2: 5,
     relay3: 6
   }
