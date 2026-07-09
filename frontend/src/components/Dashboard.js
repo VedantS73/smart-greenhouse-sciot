@@ -15,7 +15,8 @@ import {
   ExperimentOutlined,
   UnorderedListOutlined,
   ApiOutlined,
-  ControlOutlined
+  ControlOutlined,
+  DeploymentUnitOutlined
 } from '@ant-design/icons';
 import SensorPanel from './SensorPanel';
 import ActuatorPanel from './ActuatorPanel';
@@ -24,14 +25,16 @@ import ChartsPanel from './ChartsPanel';
 import PlannerPanel from './PlannerPanel';
 import EventLog from './EventLog';
 import RulesSetupModal from './RulesSetupModal';
+import PortsSetupModal from './PortsSetupModal';
 import './Dashboard.css';
 
 const { Header, Content, Footer } = Layout;
 const { Title, Text } = Typography;
 
-function Dashboard({ data, socket, connected, actuatorFeedback, setActuatorFeedback, onRulesSaved }) {
+function Dashboard({ data, socket, connected, actuatorFeedback, setActuatorFeedback, onRulesSaved, onPortsSaved }) {
   const [logOpen, setLogOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [portsOpen, setPortsOpen] = useState(false);
   const autoMode = data.planner?.auto_mode !== false;
   const readings = data.sensors?.readings || {};
   const sensorMeta = data.sensors?.meta || {};
@@ -89,6 +92,13 @@ function Dashboard({ data, socket, connected, actuatorFeedback, setActuatorFeedb
               type="text"
               icon={<ControlOutlined />}
               onClick={() => setRulesOpen(true)}
+            />
+          </Tooltip>
+          <Tooltip title="Port mapping">
+            <Button
+              type="text"
+              icon={<DeploymentUnitOutlined />}
+              onClick={() => setPortsOpen(true)}
             />
           </Tooltip>
           <Tooltip title="Activity log">
@@ -172,6 +182,13 @@ function Dashboard({ data, socket, connected, actuatorFeedback, setActuatorFeedb
         readings={readings}
         socket={socket}
         onRulesSaved={onRulesSaved}
+      />
+      <PortsSetupModal
+        open={portsOpen}
+        onClose={() => setPortsOpen(false)}
+        ports={data.ports}
+        socket={socket}
+        onPortsSaved={onPortsSaved}
       />
     </Layout>
   );

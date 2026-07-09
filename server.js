@@ -20,8 +20,14 @@ const {
   validateRules,
   normalizeRules
 } = require('./shared/rulesDefaults');
+const {
+  DEFAULT_PORTS,
+  validatePorts,
+  normalizePorts
+} = require('./shared/portsDefaults');
 
 const RULES_FILE = path.join(__dirname, 'config', 'rules.json');
+const PORTS_FILE = path.join(__dirname, 'config', 'ports.json');
 
 const app = express();
 const server = http.createServer(app);
@@ -69,6 +75,7 @@ let sensorHistory = {
 const pendingCommands = new Map();
 let commandCounter = 0;
 let rulesConfig = { ...DEFAULT_RULES };
+let portsConfig = { ...DEFAULT_PORTS };
 
 function loadRulesFromDisk() {
   try {
@@ -124,6 +131,61 @@ function applyRulesUpdate(rules, socket) {
 }
 
 loadRulesFromDisk();
+
+function loadPortsFromDisk() {
+  try {
+    if (fs.existsSync(PORTS_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(PORTS_FILE, 'utf8'));
+      const result = validatePorts(raw);
+      if (result.valid) {
+        portsConfig = result.ports;
+        return portsConfig;
+      }
+      console.warn('Invalid ports.json on disk, using defaults:', result.error);
+    }
+  } catch (err) {
+    console.warn('Failed to load ports.json, using defaults:', err.message);
+  }
+
+  portsConfig = normalizePorts(DEFAULT_PORTS);
+  savePortsToDisk(portsConfig);
+  return portsConfig;
+}
+
+function savePortsToDisk(ports) {
+  const dir = path.dirname(PORTS_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(PORTS_FILE, JSON.stringify(ports, null, 2) + '\n');
+}
+
+function publishPortsConfig(ports) {
+  mqttClient.publish('greenhouse/ports_config', JSON.stringify(ports));
+}
+
+function applyPortsUpdate(ports, socket) {
+  const result = validatePorts(ports);
+  if (!result.valid) {
+    if (socket) {
+      socket.emit('ports_nack', { reason: result.error });
+    }
+    return false;
+  }
+
+  portsConfig = result.ports;
+  savePortsToDisk(portsConfig);
+  publishPortsConfig(portsConfig);
+  io.emit('ports_update', portsConfig);
+
+  if (socket) {
+    socket.emit('ports_ack', { ports: portsConfig });
+  }
+
+  return true;
+}
+
+loadPortsFromDisk();
 
 function nowSec() {
   return Date.now() / 1000;
@@ -290,7 +352,8 @@ function getInitialData() {
     health: serviceHealth,
     history: sensorHistory,
     events: eventLog,
-    rules: rulesConfig
+    rules: rulesConfig,
+    ports: portsConfig
   };
 }
 
@@ -302,6 +365,9 @@ mqttClient.on('connect', () => {
   mqttClient.subscribe('greenhouse/status');
   mqttClient.subscribe('greenhouse/events');
   mqttClient.subscribe('greenhouse/planner');
+
+  publishRulesConfig(rulesConfig);
+  publishPortsConfig(portsConfig);
 });
 
 mqttClient.on('message', (topic, message) => {
@@ -397,6 +463,10 @@ app.get('/api/rules', (req, res) => {
   res.json(rulesConfig);
 });
 
+app.get('/api/ports', (req, res) => {
+  res.json(portsConfig);
+});
+
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`);
   socket.emit('initial_data', getInitialData());
@@ -429,6 +499,10 @@ io.on('connection', (socket) => {
 
   socket.on('update_rules', (rules) => {
     applyRulesUpdate(rules, socket);
+  });
+
+  socket.on('update_ports', (ports) => {
+    applyPortsUpdate(ports, socket);
   });
 
   socket.on('disconnect', () => {

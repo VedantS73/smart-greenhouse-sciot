@@ -20,6 +20,23 @@ const defaultRules = {
   schedule: { dayStartHour: 6, dayEndHour: 22 }
 };
 
+const defaultPorts = {
+  sensors: {
+    sound: 0,
+    light: 1,
+    moisture: 2,
+    temperatureHumidity: 7,
+    motion: 8
+  },
+  actuators: {
+    buzzer: 2,
+    relay1: 3,
+    led: 4,
+    relay2: 5,
+    relay3: 6
+  }
+};
+
 function App() {
   const [data, setData] = useState({
     sensors: emptySensors,
@@ -28,7 +45,8 @@ function App() {
     health: {},
     history: { temperature: [], humidity: [], light: [] },
     events: [],
-    rules: defaultRules
+    rules: defaultRules,
+    ports: defaultPorts
   });
   const [connected, setConnected] = useState(false);
   const [actuatorFeedback, setActuatorFeedback] = useState({});
@@ -55,7 +73,8 @@ function App() {
         health: initialData.health || {},
         history: initialData.history || {},
         events: initialData.events || [],
-        rules: initialData.rules || defaultRules
+        rules: initialData.rules || defaultRules,
+        ports: initialData.ports || defaultPorts
       });
     });
 
@@ -85,6 +104,10 @@ function App() {
 
     s.on('rules_update', (rules) => {
       setData((prev) => ({ ...prev, rules }));
+    });
+
+    s.on('ports_update', (ports) => {
+      setData((prev) => ({ ...prev, ports }));
     });
 
     s.on('actuator_ack', ({ device }) => {
@@ -133,6 +156,10 @@ function App() {
     message.success('Rules updated and applied');
   };
 
+  const handlePortsSaved = () => {
+    message.success('Port mapping updated and applied');
+  };
+
   return (
     <div className="app">
       <Dashboard
@@ -142,6 +169,7 @@ function App() {
         actuatorFeedback={actuatorFeedback}
         setActuatorFeedback={setActuatorFeedback}
         onRulesSaved={handleRulesSaved}
+        onPortsSaved={handlePortsSaved}
       />
     </div>
   );

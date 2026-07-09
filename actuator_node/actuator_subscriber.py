@@ -1,39 +1,33 @@
+import os
+import sys
+
+sys.path.insert(
+    0,
+    os.path.join(
+        os.path.dirname(__file__),
+        ".."
+    )
+)
+
 import grovepi
 import json
 import time
 import threading
 import paho.mqtt.client as mqtt
+from shared.ports_config import load_ports, apply_ports_update
 
-RELAY1 = 3
-RELAY2 = 5
-RELAY3 = 6
-LED = 4
-BUZZER = 2
+PORTS = load_ports()
 
-grovepi.pinMode(
-    RELAY1,
-    "OUTPUT"
-)
+def get_actuator_port(name):
+    return PORTS["actuators"][name]
 
-grovepi.pinMode(
-    RELAY2,
-    "OUTPUT"
-)
 
-grovepi.pinMode(
-    RELAY3,
-    "OUTPUT"
-)
-
-grovepi.pinMode(
-    LED,
-    "OUTPUT"
-)
-
-grovepi.pinMode(
-    BUZZER,
-    "OUTPUT"
-)
+def apply_pin_modes():
+    grovepi.pinMode(get_actuator_port("relay1"), "OUTPUT")
+    grovepi.pinMode(get_actuator_port("relay2"), "OUTPUT")
+    grovepi.pinMode(get_actuator_port("relay3"), "OUTPUT")
+    grovepi.pinMode(get_actuator_port("led"), "OUTPUT")
+    grovepi.pinMode(get_actuator_port("buzzer"), "OUTPUT")
 
 BROKER = "localhost"
 
@@ -97,9 +91,16 @@ def on_message(client, userdata, msg):
     global relay3_state
     global buzzer_state
 
-    payload = json.loads(
-        msg.payload.decode()
-    )
+    payload = json.loads(msg.payload.decode())
+
+    if msg.topic == "greenhouse/ports_config":
+
+        global PORTS
+        PORTS = apply_ports_update(payload)
+        apply_pin_modes()
+        print("\nActuator ports updated:")
+        print(json.dumps(PORTS["actuators"], indent=2))
+        return
 
     print("Received:", payload)
 
@@ -108,7 +109,7 @@ def on_message(client, userdata, msg):
         led_state = payload["led"]
 
         grovepi.digitalWrite(
-            LED,
+            get_actuator_port("led"),
             1 if led_state else 0
         )
 
@@ -120,14 +121,14 @@ def on_message(client, userdata, msg):
 
         relay1_state = payload["relay1"]
         grovepi.digitalWrite(
-            RELAY1,
+            get_actuator_port("relay1"),
             1 if relay1_state else 0
         )
 
     if "relay2" in payload:
         relay2_state = payload["relay2"]
         grovepi.digitalWrite(
-            RELAY2,
+            get_actuator_port("relay2"),
             1 if relay2_state else 0
         )
     
@@ -135,7 +136,7 @@ def on_message(client, userdata, msg):
 
         relay3_state = payload["relay3"]
         grovepi.digitalWrite(
-            RELAY3,
+            get_actuator_port("relay3"),
             1 if relay3_state else 0
         )
 
@@ -144,7 +145,7 @@ def on_message(client, userdata, msg):
         buzzer_state = payload["buzzer"]
 
         grovepi.digitalWrite(
-            BUZZER,
+            get_actuator_port("buzzer"),
             1 if buzzer_state else 0
         )
 
@@ -159,8 +160,13 @@ client.on_message = on_message
 
 client.connect(BROKER,1883,60)
 
+apply_pin_modes()
+
 client.subscribe(
     "greenhouse/actions"
+)
+client.subscribe(
+    "greenhouse/ports_config"
 )
 
 publish_status()

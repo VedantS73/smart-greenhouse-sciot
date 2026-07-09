@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
 
+import os
+import sys
+
+sys.path.insert(
+    0,
+    os.path.join(
+        os.path.dirname(__file__),
+        ".."
+    )
+)
+
 import grovepi
 import paho.mqtt.client as mqtt
 import json
 import time
 import threading
+from shared.ports_config import load_ports, apply_ports_update
 
 # ---------------------------------
-# SENSOR PORTS
+# SENSOR LIMITS
 # ---------------------------------
-
-SOUND_SENSOR = 0
-LIGHT_SENSOR = 1
-MOISTURE_SENSOR = 2
-
-TEMP_SENSOR = 7
-PIR_SENSOR = 8
 
 LIMITS = {
     "temperature": (-10, 60),
@@ -25,12 +30,8 @@ LIMITS = {
     "moisture": (0, 1023),
 }
 
-grovepi.pinMode(
-    PIR_SENSOR,
-    "INPUT"
-)
-
 BROKER = "localhost"
+PORTS = load_ports()
 
 client = mqtt.Client()
 
@@ -71,6 +72,49 @@ def heartbeat():
         time.sleep(10)
 
 
+def get_sensor_port(name):
+
+    return PORTS["sensors"][name]
+
+
+def apply_pin_modes():
+
+    grovepi.pinMode(
+        get_sensor_port("motion"),
+        "INPUT"
+    )
+
+
+def on_message(client, userdata, msg):
+
+    global PORTS
+
+    try:
+
+        if msg.topic != "greenhouse/ports_config":
+            return
+
+        payload = json.loads(
+            msg.payload.decode()
+        )
+
+        PORTS = apply_ports_update(payload)
+        apply_pin_modes()
+
+        print("\nSensor ports updated:")
+        print(json.dumps(PORTS["sensors"], indent=2))
+
+    except Exception as e:
+        print("Sensor config update error:", e)
+
+
+apply_pin_modes()
+
+client.on_message = on_message
+
+client.subscribe("greenhouse/ports_config")
+client.loop_start()
+
 threading.Thread(
     target=heartbeat,
     daemon=True
@@ -85,24 +129,24 @@ while True:
     try:
 
         sound = grovepi.analogRead(
-            SOUND_SENSOR
+            get_sensor_port("sound")
         )
 
         light = grovepi.analogRead(
-            LIGHT_SENSOR
+            get_sensor_port("light")
         )
 
         moisture = grovepi.analogRead(
-            MOISTURE_SENSOR
+            get_sensor_port("moisture")
         )
 
         temp, humidity = grovepi.dht(
-            TEMP_SENSOR,
+            get_sensor_port("temperatureHumidity"),
             0
         )
 
         motion = grovepi.digitalRead(
-            PIR_SENSOR
+            get_sensor_port("motion")
         )
 
         payload = {

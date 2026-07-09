@@ -10,7 +10,7 @@ This project targets a **Raspberry Pi** with a **Grove Pi+** hat and standard Gr
 
 ### Sensors
 
-Connect each Grove module to the port listed below. These mappings are defined in [`sensor_node/publisher.py`](sensor_node/publisher.py).
+Connect each Grove module to the port listed below. Default mappings are stored in [`config/ports.json`](config/ports.json) and loaded by the sensor node.
 
 | Grove Pi port | Grove module | MQTT / dashboard field | Notes |
 |---------------|--------------|------------------------|-------|
@@ -34,7 +34,7 @@ Sensor data is published every 2 seconds on MQTT topic `greenhouse/sensors`.
 
 ### Actuators
 
-Connect relays, LED, and buzzer to the ports below. These mappings are defined in [`actuator_node/actuator_subscriber.py`](actuator_node/actuator_subscriber.py).
+Connect relays, LED, and buzzer to the ports below. Default mappings are stored in [`config/ports.json`](config/ports.json) and loaded by the actuator node.
 
 | Grove Pi port | Code name | Dashboard label | Used for |
 |---------------|-----------|-----------------|----------|
@@ -82,6 +82,7 @@ Thresholds for these rules can be changed live from the dashboard **Rules Setup*
 | `server.js` | MQTT ↔ Socket.IO bridge + dashboard server |
 | `frontend/` | React dashboard (build output in `frontend/build`) |
 | `config/rules.json` | Editable planner/security thresholds |
+| `config/ports.json` | Editable sensor/actuator Grove port mappings |
 
 ## Running
 
@@ -97,9 +98,11 @@ Dashboard: **http://\<pi-ip\>:5000**
 
 ## Changing ports
 
-If your wiring differs, edit the port constants at the top of:
+You can change mappings in two ways:
 
-- [`sensor_node/publisher.py`](sensor_node/publisher.py) — sensor ports
-- [`actuator_node/actuator_subscriber.py`](actuator_node/actuator_subscriber.py) — actuator ports
+1. **Dashboard (recommended):** click **Port mapping** (network icon in header), edit ports, then **Save & Apply**.
+   - This updates [`config/ports.json`](config/ports.json) and publishes live updates over MQTT.
+   - Sensor and actuator nodes apply the new mappings immediately.
+2. **Manual file edit:** update [`config/ports.json`](config/ports.json) directly.
 
-Then restart the Python nodes (or the full stack via `smart_greenhouse.sh`).
+Live updates use MQTT topic `greenhouse/ports_config`.
