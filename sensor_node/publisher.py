@@ -31,6 +31,10 @@ LIMITS = {
 }
 
 BROKER = "localhost"
+SENSOR_TOPIC = os.environ.get(
+    "GREENHOUSE_HARDWARE_TOPIC",
+    "greenhouse/sensors/hardware"
+)
 PORTS = load_ports()
 
 client = mqtt.Client()
@@ -189,7 +193,7 @@ while True:
         )
 
         client.publish(
-            "greenhouse/sensors",
+            SENSOR_TOPIC,
             json.dumps(payload)
         )
 

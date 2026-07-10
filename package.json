@@ -6,7 +6,10 @@
   "scripts": {
     "postinstall": "cd frontend && npm install",
     "build": "cd frontend && npm run build",
+    "build:simulator": "cd frontend && npm run build:simulator",
+    "build:all": "npm run build && npm run build:simulator",
     "server": "node server.js",
+    "simulator": "node simulator_server.js",
     "start:pi": "node server.js",
     "start:python": "concurrently --names \"Publisher,Actuator,Planner\" \"python3 sensor_node/publisher.py\" \"python3 actuator_node/actuator_subscriber.py\" \"python3 planner/planner_node.py\"",
     "client": "cd frontend && npm start",

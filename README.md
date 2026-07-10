@@ -30,7 +30,7 @@ D7  →  Temp & Humidity (DHT)
 D8  →  PIR Motion Sensor
 ```
 
-Sensor data is published every 2 seconds on MQTT topic `greenhouse/sensors`.
+Sensor data is published every 2 seconds on MQTT topic `greenhouse/sensors` (merged from hardware via `sensor_mux/sensor_mux.py`). Raw Grove Pi readings are published to `greenhouse/sensors/hardware`.
 
 ### Actuators
 
@@ -75,6 +75,8 @@ Thresholds for these rules can be changed live from the dashboard **Rules Setup*
 
 | Path | Role |
 |------|------|
+| `sensor_mux/sensor_mux.py` | Merges hardware readings with simulator overrides |
+| `simulator_server.js` | Simulator UI server (port 5001) |
 | `sensor_node/publisher.py` | Reads Grove sensors, publishes MQTT |
 | `actuator_node/actuator_subscriber.py` | Controls relays/LED/buzzer |
 | `planner/` | AI planner — context rules + PDDL |
@@ -90,11 +92,37 @@ Thresholds for these rules can be changed live from the dashboard **Rules Setup*
 # Full stack on Pi
 ./smart_greenhouse.sh
 
+# Sensor simulator (attach mode — requires greenhouse stack running)
+./simulator.sh
+
 # Local development
 npm run dev
 ```
 
-Dashboard: **http://\<pi-ip\>:5000**
+Dashboard: **http://\<pi-ip\>:5000**  
+Simulator UI: **http://\<pi-ip\>:5001**
+
+## Sensor simulator
+
+The simulator runs alongside the live greenhouse stack and lets you override individual sensor fields without stopping real hardware.
+
+1. Start the greenhouse: `./smart_greenhouse.sh`
+2. Start the simulator: `./simulator.sh`
+3. Open the simulator UI at port **5001**
+
+How it works:
+
+- Real sensors keep publishing to `greenhouse/sensors/hardware`
+- The simulator UI publishes overrides to `greenhouse/sensors/override`
+- `sensor_mux.py` merges both into `greenhouse/sensors` for the planner, security node, and main dashboard
+
+Use per-field override toggles to replace readings, or **Send once** for a temporary 2-second override. **Clear All Overrides** restores passthrough from hardware.
+
+Build both UIs before deploying:
+
+```bash
+npm run build:all
+```
 
 ## Changing ports
 
