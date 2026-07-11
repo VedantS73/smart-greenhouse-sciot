@@ -4,6 +4,109 @@ MQTT-based smart greenhouse system for Raspberry Pi with Grove sensors, relay ac
 
 For deployment and development setup, see [DEPLOY.md](DEPLOY.md).
 
+## Architecture
+
+The system is built around a **message bus** (MQTT). Components publish and subscribe to shared channels — they never talk to each other directly. Data flows in one direction (sensors → decisions → actuators) while the dashboard and simulator sit alongside, reading live state and sending commands when needed.
+
+```mermaid
+flowchart TB
+  subgraph physical [Physical Greenhouse]
+    sensors[Sensors]
+    actuators[Actuators]
+  end
+
+  subgraph pi [Raspberry Pi]
+    mqtt[(MQTT Broker)]
+
+    subgraph collect [Data Collection]
+      sensorReader[Sensor Reader]
+      sensorMux[Sensor Multiplexer]
+    end
+
+    subgraph intelligence [Intelligence]
+      planner[AI Planner]
+      security[Security Alarms]
+    end
+
+    actuatorCtrl[Actuator Controller]
+
+    subgraph web [Web Layer]
+      dashServer[Dashboard Server]
+      simServer[Simulator Server]
+    end
+  end
+
+  subgraph browser [Browser]
+    dashboard[Dashboard]
+    simulator[Simulator]
+  end
+
+  sensors -->|"readings"| sensorReader
+  sensorReader -->|"hardware"| sensorMux
+  simServer -->|"overrides"| sensorMux
+  sensorMux -->|"effective sensor data"| mqtt
+
+  mqtt --> planner
+  mqtt --> security
+  mqtt --> dashServer
+
+  planner -->|"commands AUTO"| mqtt
+  security -->|"commands AUTO"| mqtt
+  dashServer -->|"commands MANUAL"| mqtt
+
+  mqtt --> actuatorCtrl
+  actuatorCtrl -->|"control"| actuators
+  actuatorCtrl -->|"status"| mqtt
+
+  dashServer <-->|"live updates"| dashboard
+  simServer <-->|"live updates"| simulator
+  mqtt --> simServer
+```
+
+### How it works
+
+**1. Data collection**
+
+Sensors on the Grove Pi+ hat are read every few seconds by the **Sensor Reader**. Raw hardware readings and optional simulator overrides feed into the **Sensor Multiplexer**, which picks the effective value per field and publishes a single merged stream for the planner, security system, and dashboard. When no overrides are active, the multiplexer passes hardware readings through unchanged.
+
+**2. Intelligence**
+
+Two services consume sensor data and decide what should happen:
+
+| Component | Role | Active when |
+|-----------|------|-------------|
+| **AI Planner** | Maps readings to context (hot, dry, dark…), runs PDDL planning, outputs actuator commands | AUTO mode |
+| **Security Alarms** | Detects intrusion and critical temperature, triggers LED and buzzer | AUTO mode |
+
+Thresholds for both are configurable live from the dashboard Rules Setup.
+
+**3. Actuation**
+
+The **Actuator Controller** receives commands from the planner, security system, or dashboard, drives relays/LED/buzzer on the Grove Pi, and reports current state back to the bus. Manual dashboard commands are tracked so the UI only confirms success when hardware actually responds.
+
+**4. Dashboard and simulator**
+
+The **Dashboard Server** bridges MQTT and the browser — pushing live sensor readings, actuator states, planner context, and events over WebSocket. Users can switch AUTO/MANUAL mode, control actuators manually, and edit rules and port mappings.
+
+The optional **Simulator** attaches to the same bus, letting you override individual sensor values for testing without stopping real hardware. See [Sensor simulator](#sensor-simulator) below.
+
+### Operating modes
+
+```mermaid
+flowchart LR
+  subgraph auto [AUTO Mode]
+    sensorsA[Sensors] --> intelligenceA[Planner + Security]
+    intelligenceA --> actuatorsA[Actuators]
+  end
+
+  subgraph manual [MANUAL Mode]
+    userM[Dashboard] --> actuatorsM[Actuators]
+    intelligenceM[Planner + Security] -.->|"paused"| actuatorsM
+  end
+```
+
+In **AUTO** mode, the planner and security system control actuators based on sensor readings and rules. In **MANUAL** mode, only the dashboard sends commands — automation is paused so you have direct control.
+
 ## Hardware
 
 This project targets a **Raspberry Pi** with a **Grove Pi+** hat and standard Grove modules. Port numbers below are **Grove Pi connector ports** as used by the `grovepi` Python library (the number printed on the Grove Pi board next to each socket).
