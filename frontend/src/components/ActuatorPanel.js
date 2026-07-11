@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Card, Button, Tooltip, Typography, message } from 'antd';
 import {
   AlertOutlined,
@@ -35,12 +35,11 @@ const ACTUATORS = [
 
 function ActuatorPanel({
   actuators,
-  socket,
   autoMode,
   actuatorFeedback,
-  setActuatorFeedback
+  pendingActuators,
+  onActuatorToggle
 }) {
-  const [pending, setPending] = useState({});
   const [msgApi, contextHolder] = message.useMessage();
 
   const handleToggle = (device, label) => {
@@ -50,18 +49,7 @@ function ActuatorPanel({
     }
 
     const state = !actuators[device];
-    setPending((prev) => ({ ...prev, [device]: true }));
-    setActuatorFeedback((prev) => {
-      const next = { ...prev };
-      delete next[device];
-      return next;
-    });
-
-    socket.emit(`toggle_${device}`, state);
-
-    setTimeout(() => {
-      setPending((prev) => ({ ...prev, [device]: false }));
-    }, 5000);
+    onActuatorToggle(device, state);
   };
 
   return (
@@ -75,7 +63,7 @@ function ActuatorPanel({
       <div className="actuators-stack">
         {ACTUATORS.map(({ id, icon: Icon, label, color }) => {
           const isActive = actuators[id] ?? false;
-          const isPending = pending[id];
+          const isPending = pendingActuators[id];
           const feedback = actuatorFeedback[id];
           const hasError = feedback?.status === 'error';
 

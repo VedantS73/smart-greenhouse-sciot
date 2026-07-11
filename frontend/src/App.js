@@ -50,6 +50,7 @@ function App() {
   });
   const [connected, setConnected] = useState(false);
   const [actuatorFeedback, setActuatorFeedback] = useState({});
+  const [pendingActuators, setPendingActuators] = useState({});
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
@@ -111,8 +112,13 @@ function App() {
     });
 
     s.on('actuator_ack', ({ device }) => {
-      const labels = { led: 'Alarm LED', relay1: 'Fan', relay2: 'Pump', relay3: 'Grow Light' };
-      message.success(`${labels[device] || device} confirmed`);
+      const labels = { led: 'Alarm LED', relay1: 'Fan', relay2: 'Pump', relay3: 'Grow Light', buzzer: 'Buzzer' };
+      message.success(`${labels[device] || device} confirmed`, 1);
+      setPendingActuators((prev) => {
+        const next = { ...prev };
+        delete next[device];
+        return next;
+      });
       setActuatorFeedback((prev) => ({
         ...prev,
         [device]: { status: 'ok', message: 'Confirmed' }
@@ -123,17 +129,28 @@ function App() {
           delete next[device];
           return next;
         });
-      }, 2000);
+      }, 1500);
     });
 
-    s.on('actuator_nack', ({ device, reason }) => {
+    s.on('actuator_nack', ({ device, reason, actual }) => {
       const messages = {
         timeout: 'Hardware did not respond',
         hardware_mismatch: 'Hardware state mismatch',
         auto_mode_active: 'Switch to MANUAL mode first'
       };
-      const labels = { led: 'Alarm LED', relay1: 'Fan', relay2: 'Pump', relay3: 'Grow Light' };
+      const labels = { led: 'Alarm LED', relay1: 'Fan', relay2: 'Pump', relay3: 'Grow Light', buzzer: 'Buzzer' };
       message.error(`${labels[device] || device}: ${messages[reason] || 'Command failed'}`);
+      setPendingActuators((prev) => {
+        const next = { ...prev };
+        delete next[device];
+        return next;
+      });
+      if (actual !== undefined) {
+        setData((prev) => ({
+          ...prev,
+          actuators: { ...prev.actuators, [device]: actual }
+        }));
+      }
       setActuatorFeedback((prev) => ({
         ...prev,
         [device]: {
@@ -160,6 +177,20 @@ function App() {
     message.success('Port mapping updated and applied');
   };
 
+  const handleActuatorToggle = (device, state) => {
+    setPendingActuators((prev) => ({ ...prev, [device]: true }));
+    setData((prev) => ({
+      ...prev,
+      actuators: { ...prev.actuators, [device]: state }
+    }));
+    setActuatorFeedback((prev) => {
+      const next = { ...prev };
+      delete next[device];
+      return next;
+    });
+    socket.emit(`toggle_${device}`, state);
+  };
+
   return (
     <div className="app">
       <Dashboard
@@ -168,6 +199,8 @@ function App() {
         connected={connected}
         actuatorFeedback={actuatorFeedback}
         setActuatorFeedback={setActuatorFeedback}
+        pendingActuators={pendingActuators}
+        onActuatorToggle={handleActuatorToggle}
         onRulesSaved={handleRulesSaved}
         onPortsSaved={handlePortsSaved}
       />

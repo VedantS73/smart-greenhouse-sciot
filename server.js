@@ -43,7 +43,7 @@ app.use(express.json());
 
 const BROKER = process.env.MQTT_BROKER || 'localhost';
 const MQTT_PORT = process.env.MQTT_PORT || 1883;
-const COMMAND_TIMEOUT_MS = 5000;
+const COMMAND_TIMEOUT_MS = 1500;
 const HISTORY_MAX = 60;
 
 const mqttClient = mqtt.connect(`mqtt://${BROKER}:${MQTT_PORT}`);
@@ -293,11 +293,14 @@ function resolvePendingCommands() {
   }
 
   const toDelete = [];
+  const statusCommandId = actuatorState.command_id;
 
   for (const [id, cmd] of pendingCommands.entries()) {
     const actual = actuatorState[cmd.device];
+    const commandConfirmed = statusCommandId === cmd.commandId;
+    const stateMatches = actual === cmd.expectedState;
 
-    if (actual === cmd.expectedState) {
+    if (commandConfirmed && stateMatches) {
       io.to(cmd.socketId).emit('actuator_ack', {
         commandId: id,
         device: cmd.device,
@@ -325,10 +328,16 @@ function resolvePendingCommands() {
 }
 
 function publishActuatorCommand(device, state, socketId) {
-  const commandId = `cmd-${++commandCounter}`;
-  const payload = { [device]: state };
+  for (const [id, cmd] of pendingCommands.entries()) {
+    if (cmd.device === device) {
+      pendingCommands.delete(id);
+    }
+  }
 
-  mqttClient.publish('greenhouse/actions', JSON.stringify(payload));
+  const commandId = `cmd-${++commandCounter}-${Date.now()}`;
+  const payload = { [device]: state, command_id: commandId };
+
+  mqttClient.publish('greenhouse/actions', JSON.stringify(payload), { qos: 1 });
 
   pendingCommands.set(commandId, {
     commandId,
@@ -337,6 +346,13 @@ function publishActuatorCommand(device, state, socketId) {
     socketId,
     createdAt: Date.now()
   });
+
+  actuatorState = { ...actuatorState, [device]: state };
+  const clientState = { ...actuatorState };
+  delete clientState.command_id;
+  io.emit('actuator_update', clientState);
+
+  setImmediate(resolvePendingCommands);
 
   return commandId;
 }
@@ -381,7 +397,9 @@ mqttClient.on('message', (topic, message) => {
 
     if (topic === 'greenhouse/actuator_status') {
       actuatorState = payload;
-      io.emit('actuator_update', actuatorState);
+      const clientState = { ...payload };
+      delete clientState.command_id;
+      io.emit('actuator_update', clientState);
       resolvePendingCommands();
       emitPlannerUpdate();
       return;
@@ -436,8 +454,9 @@ setInterval(() => {
 
   io.emit('health_update', serviceHealth);
   checkStaleSensors();
-  resolvePendingCommands();
 }, 2000);
+
+setInterval(resolvePendingCommands, 100);
 
 app.get('/api/dashboard', (req, res) => {
   res.json(getInitialData());
@@ -491,6 +510,8 @@ io.on('connection', (socket) => {
 
   socket.on('set_mode', (mode) => {
     const target = mode === 'auto' ? 'AUTO' : 'MANUAL';
+    plannerData.auto_mode = target === 'AUTO';
+    emitPlannerUpdate();
     mqttClient.publish(
       'greenhouse/mode',
       JSON.stringify({ mode: target })

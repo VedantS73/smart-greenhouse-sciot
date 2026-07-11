@@ -31,7 +31,17 @@ import './Dashboard.css';
 const { Header, Content, Footer } = Layout;
 const { Title, Text } = Typography;
 
-function Dashboard({ data, socket, connected, actuatorFeedback, setActuatorFeedback, onRulesSaved, onPortsSaved }) {
+function Dashboard({
+  data,
+  socket,
+  connected,
+  actuatorFeedback,
+  setActuatorFeedback,
+  pendingActuators,
+  onActuatorToggle,
+  onRulesSaved,
+  onPortsSaved
+}) {
   const [logOpen, setLogOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [portsOpen, setPortsOpen] = useState(false);
@@ -130,10 +140,10 @@ function Dashboard({ data, socket, connected, actuatorFeedback, setActuatorFeedb
           <Col flex="88px" className="actuators-col">
             <ActuatorPanel
               actuators={data.actuators}
-              socket={socket}
               autoMode={autoMode}
               actuatorFeedback={actuatorFeedback}
-              setActuatorFeedback={setActuatorFeedback}
+              pendingActuators={pendingActuators}
+              onActuatorToggle={onActuatorToggle}
             />
           </Col>
         </Row>

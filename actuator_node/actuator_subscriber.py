@@ -43,7 +43,7 @@ _shutdown_started = False
 client = mqtt.Client()
 
 
-def publish_status():
+def publish_status(command_id=None):
 
     payload = {
         "led": led_state,
@@ -52,6 +52,9 @@ def publish_status():
         "relay2": relay2_state,
         "relay3": relay3_state
     }
+
+    if command_id:
+        payload["command_id"] = command_id
 
     client.publish(
         "greenhouse/actuator_status",
@@ -152,6 +155,7 @@ def on_message(client, userdata, msg):
     global buzzer_state
 
     payload = json.loads(msg.payload.decode())
+    command_id = payload.pop("command_id", None)
 
     if msg.topic == "greenhouse/ports_config":
 
@@ -213,7 +217,7 @@ def on_message(client, userdata, msg):
             f"Buzzer {'ON' if buzzer_state else 'OFF'}"
         )
 
-    publish_status()
+    publish_status(command_id=command_id)
 
 
 client.on_message = on_message

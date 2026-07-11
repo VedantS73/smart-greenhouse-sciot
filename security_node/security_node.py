@@ -28,6 +28,8 @@ alarm_state = {
     "buzzer": False
 }
 
+AUTO_MODE = True
+
 
 # ---------------------------------
 # HEARTBEAT
@@ -71,6 +73,9 @@ def publish_event(message):
 def publish_alarm(led, buzzer):
 
     global alarm_state
+
+    if not AUTO_MODE:
+        return
 
     #
     # Don't publish if nothing changed
@@ -149,6 +154,8 @@ def evaluate_sensor_data(data):
 
 def on_message(client, userdata, msg):
 
+    global AUTO_MODE
+
     try:
 
         if msg.topic == "greenhouse/config":
@@ -164,6 +171,12 @@ def on_message(client, userdata, msg):
             print("\nSecurity rules updated:")
             print(json.dumps(RULES["security"], indent=2))
 
+            return
+
+        if msg.topic == "greenhouse/mode":
+            payload = json.loads(msg.payload.decode())
+            AUTO_MODE = payload.get("mode") == "AUTO"
+            print("\nSecurity mode:", "AUTO" if AUTO_MODE else "MANUAL")
             return
 
         data = json.loads(
@@ -198,6 +211,10 @@ client.subscribe(
 
 client.subscribe(
     "greenhouse/config"
+)
+
+client.subscribe(
+    "greenhouse/mode"
 )
 
 
