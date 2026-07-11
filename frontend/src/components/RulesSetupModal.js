@@ -10,7 +10,8 @@ import {
   Tag,
   Divider,
   Row,
-  Col
+  Col,
+  Switch
 } from 'antd';
 import {
   FireOutlined,
@@ -18,7 +19,8 @@ import {
   BulbOutlined,
   ExperimentOutlined,
   SafetyOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  SoundOutlined
 } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -28,7 +30,7 @@ const DEFAULT_RULES = {
   humidity: { dryBelow: 40, wetAbove: 70 },
   light: { lowBelow: 200, highAbove: 350 },
   soil: { dryBelow: 450, wetAbove: 650 },
-  security: { intrusionLightBelow: 200, criticalTempAbove: 40 },
+  security: { intrusionLightBelow: 200, criticalTempAbove: 40, buzzerOnIntrusion: true, buzzerOnOverheat: true },
   schedule: { dayStartHour: 6, dayEndHour: 22 }
 };
 
@@ -362,6 +364,30 @@ function RulesSetupModal({ open, onClose, rules, readings, socket, onRulesSaved 
               />
             </Col>
           </Row>
+          <Divider style={{ margin: '12px 0' }} />
+          <Text type="secondary" className="rules-buzzer-label">
+            <SoundOutlined /> Buzzer on alarm
+          </Text>
+          <Row gutter={12} className="rules-buzzer-toggles">
+            <Col span={12}>
+              <Space>
+                <Switch
+                  checked={security.buzzerOnIntrusion !== false}
+                  onChange={(checked) => updateSection('security', { buzzerOnIntrusion: checked })}
+                />
+                <Text>On intrusion</Text>
+              </Space>
+            </Col>
+            <Col span={12}>
+              <Space>
+                <Switch
+                  checked={security.buzzerOnOverheat !== false}
+                  onChange={(checked) => updateSection('security', { buzzerOnOverheat: checked })}
+                />
+                <Text>On overheat</Text>
+              </Space>
+            </Col>
+          </Row>
         </Card>
 
         <Card size="small" bordered={false} className="rules-section-card">
@@ -482,6 +508,14 @@ function RulesSetupModal({ open, onClose, rules, readings, socket, onRulesSaved 
           display: block;
           font-size: 11px;
           margin-bottom: 4px;
+        }
+        .rules-buzzer-label {
+          display: block;
+          font-size: 12px;
+          margin-bottom: 8px;
+        }
+        .rules-buzzer-toggles {
+          margin-top: 4px;
         }
         .rules-error {
           display: block;

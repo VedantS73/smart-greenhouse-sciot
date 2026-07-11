@@ -5,7 +5,7 @@ const DEFAULT_RULES = {
   humidity: { dryBelow: 40, wetAbove: 70 },
   light: { lowBelow: 200, highAbove: 350 },
   soil: { dryBelow: 450, wetAbove: 650 },
-  security: { intrusionLightBelow: 200, criticalTempAbove: 40 },
+  security: { intrusionLightBelow: 200, criticalTempAbove: 40, buzzerOnIntrusion: true, buzzerOnOverheat: true },
   schedule: { dayStartHour: 6, dayEndHour: 22 }
 };
 
@@ -89,6 +89,20 @@ function validateRules(rules) {
     return { valid: false, error: 'security.criticalTempAbove out of range' };
   }
 
+  if (
+    security.buzzerOnIntrusion !== undefined &&
+    typeof security.buzzerOnIntrusion !== 'boolean'
+  ) {
+    return { valid: false, error: 'security.buzzerOnIntrusion must be a boolean' };
+  }
+
+  if (
+    security.buzzerOnOverheat !== undefined &&
+    typeof security.buzzerOnOverheat !== 'boolean'
+  ) {
+    return { valid: false, error: 'security.buzzerOnOverheat must be a boolean' };
+  }
+
   const schedule = rules.schedule;
   if (!schedule || typeof schedule !== 'object') {
     return { valid: false, error: 'Missing section: schedule' };
@@ -135,7 +149,9 @@ function normalizeRules(rules) {
     },
     security: {
       intrusionLightBelow: rules.security.intrusionLightBelow,
-      criticalTempAbove: rules.security.criticalTempAbove
+      criticalTempAbove: rules.security.criticalTempAbove,
+      buzzerOnIntrusion: rules.security.buzzerOnIntrusion !== false,
+      buzzerOnOverheat: rules.security.buzzerOnOverheat !== false
     },
     schedule: {
       dayStartHour: rules.schedule.dayStartHour,

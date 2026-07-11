@@ -11,7 +11,7 @@ DEFAULT_RULES = {
     "humidity": {"dryBelow": 40, "wetAbove": 70},
     "light": {"lowBelow": 200, "highAbove": 350},
     "soil": {"dryBelow": 450, "wetAbove": 650},
-    "security": {"intrusionLightBelow": 200, "criticalTempAbove": 40},
+    "security": {"intrusionLightBelow": 200, "criticalTempAbove": 40, "buzzerOnIntrusion": True, "buzzerOnOverheat": True},
     "schedule": {"dayStartHour": 6, "dayEndHour": 22}
 }
 
@@ -56,7 +56,9 @@ def _normalize(data):
         },
         "security": {
             "intrusionLightBelow": data["security"]["intrusionLightBelow"],
-            "criticalTempAbove": data["security"]["criticalTempAbove"]
+            "criticalTempAbove": data["security"]["criticalTempAbove"],
+            "buzzerOnIntrusion": data["security"].get("buzzerOnIntrusion", True),
+            "buzzerOnOverheat": data["security"].get("buzzerOnOverheat", True),
         },
         "schedule": {
             "dayStartHour": data["schedule"]["dayStartHour"],

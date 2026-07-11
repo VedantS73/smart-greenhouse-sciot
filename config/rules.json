@@ -3,6 +3,6 @@
   "humidity": { "dryBelow": 40, "wetAbove": 70 },
   "light": { "lowBelow": 200, "highAbove": 350 },
   "soil": { "dryBelow": 450, "wetAbove": 650 },
-  "security": { "intrusionLightBelow": 200, "criticalTempAbove": 40 },
+  "security": { "intrusionLightBelow": 200, "criticalTempAbove": 40, "buzzerOnIntrusion": true, "buzzerOnOverheat": true },
   "schedule": { "dayStartHour": 6, "dayEndHour": 22 }
 }

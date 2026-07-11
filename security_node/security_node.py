@@ -128,7 +128,7 @@ def evaluate_sensor_data(data):
 
         publish_alarm(
             True,
-            True
+            security.get("buzzerOnIntrusion", True)
         )
 
     elif overheat:
@@ -137,7 +137,7 @@ def evaluate_sensor_data(data):
 
         publish_alarm(
             True,
-            True
+            security.get("buzzerOnOverheat", True)
         )
 
     else:
