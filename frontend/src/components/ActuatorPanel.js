@@ -70,11 +70,7 @@ function ActuatorPanel({
           return (
             <Tooltip
               key={id}
-              title={
-                autoMode
-                  ? 'AUTO mode — switch to Manual'
-                  : `${label}: ${isActive ? 'ON' : 'OFF'}${hasError ? ` — ${feedback.message}` : ''}`
-              }
+              title={`${label}: ${isActive ? 'ON' : 'OFF'}${hasError ? ` — ${feedback.message}` : ''}`}
             >
               <Button
                 type={isActive ? 'primary' : 'default'}
