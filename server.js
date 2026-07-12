@@ -28,6 +28,8 @@ const {
 
 const RULES_FILE = path.join(__dirname, 'config', 'rules.json');
 const PORTS_FILE = path.join(__dirname, 'config', 'ports.json');
+const PDDL_DOMAIN_FILE = path.join(__dirname, 'pddl', 'domain.pddl');
+const PDDL_PROBLEM_FILE = path.join(__dirname, 'pddl', 'problem.pddl');
 
 const app = express();
 const server = http.createServer(app);
@@ -486,6 +488,37 @@ app.get('/api/ports', (req, res) => {
   res.json(portsConfig);
 });
 
+app.get('/api/planner/domain', (req, res) => {
+  try {
+    if (!fs.existsSync(PDDL_DOMAIN_FILE)) {
+      res.status(404).json({ error: 'PDDL domain file not found' });
+      return;
+    }
+    res.type('text/plain').send(fs.readFileSync(PDDL_DOMAIN_FILE, 'utf8'));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/planner/problem', (req, res) => {
+  try {
+    if (!fs.existsSync(PDDL_PROBLEM_FILE)) {
+      res.status(404).json({ error: 'PDDL problem file not found' });
+      return;
+    }
+    res.type('text/plain').send(fs.readFileSync(PDDL_PROBLEM_FILE, 'utf8'));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/planner', (req, res) => {
+  res.json({
+    ...plannerData,
+    action_mismatch: computeActionMismatch()
+  });
+});
+
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`);
   socket.emit('initial_data', getInitialData());
@@ -524,6 +557,24 @@ io.on('connection', (socket) => {
 
   socket.on('update_ports', (ports) => {
     applyPortsUpdate(ports, socket);
+  });
+
+  socket.on('request_replan', () => {
+    mqttClient.publish('greenhouse/planner/replan', '{}');
+    socket.emit('replan_ack', { status: 'requested' });
+  });
+
+  socket.on('apply_planner_actions', () => {
+    if (!plannerData.auto_mode) {
+      socket.emit('apply_planner_nack', { reason: 'manual_mode_active' });
+      return;
+    }
+
+    const actions = plannerData.actions || {};
+    const payload = { ...actions };
+
+    mqttClient.publish('greenhouse/actions', JSON.stringify(payload), { qos: 1 });
+    socket.emit('apply_planner_ack', { actions });
   });
 
   socket.on('disconnect', () => {

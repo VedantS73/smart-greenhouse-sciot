@@ -17,7 +17,7 @@ import threading
 import paho.mqtt.client as mqtt
 from generate_problem import generate_problem
 from run_planner import run_planner
-from plan_parser import plan_to_actions
+from plan_parser import plan_to_actions, context_to_actions, plan_has_relay_commands
 from shared.rules_config import load_rules, apply_rules_update
 
 BROKER = "localhost"
@@ -35,6 +35,9 @@ current_state = {
 AUTO_MODE = True
 last_context = None
 last_sensor_data = None
+last_problem_pddl = ""
+last_plan_steps = []
+last_plan_source = "rules"
 RULES = load_rules()
 
 # ---------------------------------
@@ -62,7 +65,10 @@ def heartbeat():
 def publish_planner_status(
     context=None,
     goal=None,
-    actions=None
+    actions=None,
+    plan=None,
+    problem_pddl=None,
+    plan_source=None
 ):
 
     client.publish(
@@ -83,6 +89,15 @@ def publish_planner_status(
 
             "rules":
             RULES,
+
+            "plan_steps":
+            plan if plan is not None else last_plan_steps,
+
+            "problem_pddl":
+            problem_pddl if problem_pddl is not None else last_problem_pddl,
+
+            "plan_source":
+            plan_source if plan_source is not None else last_plan_source,
 
             "timestamp":
             time.time()
@@ -222,61 +237,109 @@ def get_goal():
 
     }
 
+def relay_actions_differ(desired, actual):
+
+    for device in ("relay1", "relay2", "relay3"):
+        if bool(desired.get(device)) != bool(actual.get(device)):
+            return True
+
+    return False
+
+
+def resolve_actions(context, plan):
+
+    if plan and plan_has_relay_commands(plan):
+        return plan_to_actions(plan)
+
+    return context_to_actions(context, RULES)
+
+
 # ---------------------------------
 # PLANNER
 # ---------------------------------
 
-def run_planning_pipeline(sensor_data):
+def run_planning_pipeline(sensor_data, force=False):
 
-    global last_context
+    global last_context, last_problem_pddl, last_plan_steps, last_plan_source
 
     context = get_context(sensor_data)
-
-    if context == last_context:
-        print("\nNo context change - planner not executed.")
-        return
-
-    last_context = context.copy()
     goal = get_goal()
+    context_changed = force or context != last_context
+    plan = []
+    problem_pddl = last_problem_pddl
 
-    problem = generate_problem(context, RULES)
+    if context_changed:
 
-    print("\n===================================")
-    print("Generated Problem")
-    print(problem)
+        problem_pddl = generate_problem(context, RULES)
+        last_problem_pddl = problem_pddl
 
-    plan = run_planner()
+        print("\n===================================")
+        print("Generated Problem")
+        print(problem_pddl)
 
-    print("\nReturned Plan")
-    print(plan)
+        plan = run_planner()
+        last_plan_steps = plan
+        last_context = context.copy()
 
-    actions = plan_to_actions(plan)
-    print("\n===================================")
-    print("Current Context")
-    print(context)
+        print("\nReturned Plan")
+        print(plan)
 
-    print("\nGoal State")
-    print(goal)
+    actions = resolve_actions(context, plan)
+    last_plan_source = (
+        "pddl"
+        if plan and plan_has_relay_commands(plan)
+        else "rules"
+    )
 
-    print("\nMQTT Actions")
-    print(actions)
+    should_publish = (
+        AUTO_MODE and
+        relay_actions_differ(actions, current_state)
+    )
 
-    print("\nAuto Mode")
-    print(AUTO_MODE)
-    print("===================================")
+    if context_changed or should_publish:
+        print("\n===================================")
+        print("Current Context")
+        print(context)
+        print("\nGoal State")
+        print(goal)
+        print("\nReturned Plan")
+        print(plan)
+        print("\nMQTT Actions")
+        print(actions)
+        print("\nAuto Mode")
+        print(AUTO_MODE)
+        print("===================================")
 
-    if AUTO_MODE:
+    if should_publish:
 
         client.publish(
             "greenhouse/actions",
             json.dumps(actions)
         )
 
-    publish_planner_status(
-        context,
-        goal,
-        actions
-    )
+    if context_changed or should_publish or force:
+        publish_planner_status(
+            context,
+            goal,
+            actions,
+            plan=plan,
+            problem_pddl=problem_pddl,
+            plan_source=last_plan_source
+        )
+
+
+def handle_replan():
+
+    global last_context
+
+    print("\nReplan requested")
+
+    last_context = None
+
+    if last_sensor_data:
+        run_planning_pipeline(last_sensor_data, force=True)
+    else:
+        publish_planner_status()
 
 # ---------------------------------
 # ACTUATOR STATUS
@@ -370,6 +433,12 @@ def on_message(client, userdata, msg):
 
             return
 
+        if msg.topic == "greenhouse/planner/replan":
+
+            handle_replan()
+
+            return
+
         # -----------------
         # SENSOR DATA
         # -----------------
@@ -415,6 +484,10 @@ client.subscribe(
 
 client.subscribe(
     "greenhouse/config"
+)
+
+client.subscribe(
+    "greenhouse/planner/replan"
 )
 
 # ---------------------------------

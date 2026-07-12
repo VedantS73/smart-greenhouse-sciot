@@ -26,6 +26,7 @@ import PlannerPanel from './PlannerPanel';
 import EventLog from './EventLog';
 import RulesSetupModal from './RulesSetupModal';
 import PortsSetupModal from './PortsSetupModal';
+import PlannerExplorerModal from './PlannerExplorerModal';
 import './Dashboard.css';
 
 const { Header, Content, Footer } = Layout;
@@ -45,6 +46,7 @@ function Dashboard({
   const [logOpen, setLogOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [portsOpen, setPortsOpen] = useState(false);
+  const [plannerExplorerOpen, setPlannerExplorerOpen] = useState(false);
   const autoMode = data.planner?.auto_mode !== false;
   const readings = data.sensors?.readings || {};
   const sensorMeta = data.sensors?.meta || {};
@@ -126,7 +128,10 @@ function Dashboard({
       <Content className="dashboard-content">
         <Row gutter={[12, 12]} className="row-sensors">
           <Col flex="140px">
-            <HealthStatus score={healthScore} />
+            <HealthStatus
+              score={healthScore}
+              onClick={() => setPlannerExplorerOpen(true)}
+            />
           </Col>
           <Col flex="auto">
             <SensorPanel readings={readings} meta={sensorMeta} />
@@ -184,6 +189,18 @@ function Dashboard({
       >
         <EventLog events={data.events} />
       </Drawer>
+
+      <PlannerExplorerModal
+        open={plannerExplorerOpen}
+        onClose={() => setPlannerExplorerOpen(false)}
+        score={healthScore}
+        readings={readings}
+        sensorMeta={sensorMeta}
+        planner={data.planner}
+        actuators={data.actuators}
+        socket={socket}
+        autoMode={autoMode}
+      />
 
       <RulesSetupModal
         open={rulesOpen}
