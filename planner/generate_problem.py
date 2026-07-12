@@ -42,7 +42,9 @@ def generate_problem(context, rules=None):
 
     if context["light"] == "LOW":
         init.append("(light-low)")
-        goal.append("(led-on)")
+         # Grow lights are only used during daytime
+        if is_daytime:
+            goal.append("(led-on)")
     else:
         init.append("(light-normal)")
 
