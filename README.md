@@ -24,7 +24,19 @@ flowchart TB
     end
 
     subgraph intelligence [Intelligence]
-      planner[AI Planner]
+      subgraph planner [AI Planner - PDDL pipeline]
+        contextModel[Context Model]
+        problemGen[Problem Generator]
+        pddlPlanner[PDDL Planner - pyperplan]
+        planParser[Plan Parser + Rule Fallback]
+      end
+
+      subgraph kb [Knowledge Base]
+        domain[[PDDL Domain]]
+        problem[[PDDL Problem - generated]]
+        rules[[Rules Config]]
+      end
+
       security[Security Alarms]
     end
 
@@ -41,23 +53,38 @@ flowchart TB
     simulator[Simulator]
   end
 
+  %% sensing
   sensors -->|"readings"| sensorReader
   sensorReader -->|"hardware"| sensorMux
   simServer -->|"overrides"| sensorMux
   sensorMux -->|"effective sensor data"| mqtt
 
-  mqtt --> planner
+  %% fan-out from the bus
+  mqtt -->|"sensor data"| contextModel
   mqtt --> security
   mqtt --> dashServer
 
-  planner -->|"commands AUTO"| mqtt
+  %% PDDL planning pipeline
+  rules -.->|"thresholds"| contextModel
+  contextModel -->|"symbolic context"| problemGen
+  rules -.-> problemGen
+  problemGen -->|"writes init + goal"| problem
+  problem -->|"problem instance"| pddlPlanner
+  domain -->|"actions + effects"| pddlPlanner
+  pddlPlanner -->|"plan steps"| planParser
+  contextModel -.->|"fallback when no plan"| planParser
+  planParser -->|"commands AUTO"| mqtt
+
+  %% security + manual control
   security -->|"commands AUTO"| mqtt
   dashServer -->|"commands MANUAL"| mqtt
 
+  %% actuation
   mqtt --> actuatorCtrl
   actuatorCtrl -->|"control"| actuators
   actuatorCtrl -->|"status"| mqtt
 
+  %% web layer
   dashServer <-->|"live updates"| dashboard
   simServer <-->|"live updates"| simulator
   mqtt --> simServer
@@ -75,10 +102,21 @@ Two services consume sensor data and decide what should happen:
 
 | Component | Role | Active when |
 |-----------|------|-------------|
-| **AI Planner** | Maps readings to context (hot, dry, dark…), runs PDDL planning, outputs actuator commands | AUTO mode |
+| **AI Planner** | Runs a PDDL planning pipeline over the merged sensor stream and outputs actuator commands | AUTO mode |
 | **Security Alarms** | Detects intrusion and critical temperature, triggers LED and buzzer | AUTO mode |
 
 Thresholds for both are configurable live from the dashboard Rules Setup.
+
+**The PDDL layer** — the AI Planner is not a single black box; it is a four-stage pipeline backed by a knowledge base:
+
+| Stage | Component | What it does |
+|-------|-----------|--------------|
+| 1. Context | **Context Model** | Discretises raw readings into symbolic context using threshold rules (e.g. `temperature=HOT`, `soil=DRY`, `light=LOW`). |
+| 2. Problem | **Problem Generator** | Turns the current context into a PDDL **problem instance** (`init` facts + `goal`) and writes `pddl/problem.pddl`. |
+| 3. Plan | **PDDL Planner** | Runs [`pyperplan`](https://github.com/aibasel/pyperplan) over the static `pddl/domain.pddl` and the generated problem to produce a plan (a sequence of actions such as `turn-on-fan`, `turn-on-pump`). |
+| 4. Execute | **Plan Parser** | Maps plan actions to relay/LED commands. If the planner returns no relay actions, it falls back to direct rule evaluation of the context so control never stalls. |
+
+The **Knowledge Base** holds the planner's world model: the static **PDDL domain** ([`pddl/domain.pddl`](pddl/domain.pddl)) defining predicates, actions, preconditions and effects; the **generated PDDL problem** ([`pddl/problem.pddl`](pddl/problem.pddl)) regenerated on every state change; and the **rules config** ([`config/rules.json`](config/rules.json)) supplying thresholds and the day/night schedule.
 
 **3. Actuation**
 
