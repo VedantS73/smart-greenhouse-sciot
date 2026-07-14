@@ -9,85 +9,78 @@ For deployment and development setup, see [DEPLOY.md](DEPLOY.md).
 The system is built around a **message bus** (MQTT). Components publish and subscribe to shared channels — they never talk to each other directly. Data flows in one direction (sensors → decisions → actuators) while the dashboard and simulator sit alongside, reading live state and sending commands when needed.
 
 ```mermaid
+---
+config:
+    flowchart:
+        defaultRenderer: elk
+---
 flowchart TB
-  subgraph physical [Physical Greenhouse]
-    sensors[Sensors]
-    actuators[Actuators]
+ subgraph physical["Physical Greenhouse"]
+        sensors["Sensors"]
+        actuators["Physical Actuators"]
   end
-
-  subgraph pi [Raspberry Pi]
-    mqtt[(MQTT Broker)]
-
-    subgraph collect [Data Collection]
-      sensorReader[Sensor Reader]
-      sensorMux[Sensor Multiplexer]
-    end
-
-    subgraph intelligence [Intelligence]
-      subgraph planner [AI Planner - PDDL pipeline]
-        contextModel[Context Model]
-        problemGen[Problem Generator]
-        pddlPlanner[PDDL Planner - pyperplan]
-        planParser[Plan Parser + Rule Fallback]
-      end
-
-      subgraph kb [Knowledge Base]
-        domain[[PDDL Domain]]
-        problem[[PDDL Problem - generated]]
-        rules[[Rules Config]]
-      end
-
-      security[Security Alarms]
-    end
-
-    actuatorCtrl[Actuator Controller]
-
-    subgraph web [Web Layer]
-      dashServer[Dashboard Server]
-      simServer[Simulator Server]
-    end
+ subgraph collect["Data Collection"]
+        sensorReader["Sensor Reader"]
+        sensorMux["Sensor Multiplexer"]
   end
-
-  subgraph browser [Browser]
-    dashboard[Dashboard]
-    simulator[Simulator]
+ subgraph planner["AI Planning Pipeline"]
+        contextGen["Context Generation"]
+        problemGen["Problem Generator"]
+        pddlPlanner["PDDL Planner<br>pyperplan"]
+        planParser["Plan Parser<br>+ Rule Fallback"]
+        execution["Execution Manager"]
   end
-
-  %% sensing
-  sensors -->|"readings"| sensorReader
-  sensorReader -->|"hardware"| sensorMux
-  simServer -->|"overrides"| sensorMux
-  sensorMux -->|"effective sensor data"| mqtt
-
-  %% fan-out from the bus
-  mqtt -->|"sensor data"| contextModel
-  mqtt --> security
-  mqtt --> dashServer
-
-  %% PDDL planning pipeline
-  rules -.->|"thresholds"| contextModel
-  contextModel -->|"symbolic context"| problemGen
-  rules -.-> problemGen
-  problemGen -->|"writes init + goal"| problem
-  problem -->|"problem instance"| pddlPlanner
-  domain -->|"actions + effects"| pddlPlanner
-  pddlPlanner -->|"plan steps"| planParser
-  contextModel -.->|"fallback when no plan"| planParser
-  planParser -->|"commands AUTO"| mqtt
-
-  %% security + manual control
-  security -->|"commands AUTO"| mqtt
-  dashServer -->|"commands MANUAL"| mqtt
-
-  %% actuation
-  mqtt --> actuatorCtrl
-  actuatorCtrl -->|"control"| actuators
-  actuatorCtrl -->|"status"| mqtt
-
-  %% web layer
-  dashServer <-->|"live updates"| dashboard
-  simServer <-->|"live updates"| simulator
-  mqtt --> simServer
+ subgraph kb["Knowledge Base"]
+        domain[["PDDL Domain"]]
+        problem[["Generated PDDL Problem"]]
+        rules[["Rules"]]
+        config[["Configuration"]]
+  end
+ subgraph intelligence["Intelligence"]
+        planner
+        kb
+        security["Security Manager"]
+        sms["SMS Notification Service<br>(Software Actuator)"]
+  end
+ subgraph web["Web Layer"]
+        dashBackend["Dashboard Backend"]
+        simEngine["Simulation Engine"]
+  end
+ subgraph pi["Raspberry Pi"]
+        mqtt[("MQTT Broker")]
+        collect
+        intelligence
+        actuatorCtrl["Actuator Controller"]
+        web
+  end
+ subgraph browser["Browser"]
+        dashboard["Dashboard"]
+        simulator["Simulator"]
+  end
+    sensors -- sensor readings --> sensorReader
+    sensorReader -- hardware data --> sensorMux
+    simEngine -- simulated overrides --> sensorMux
+    sensorMux -- effective sensor data --> mqtt
+    mqtt -- sensor data --> contextGen
+    mqtt --> security & dashBackend & actuatorCtrl & simEngine
+    rules -. thresholds .-> contextGen
+    contextGen -- symbolic context --> problemGen
+    rules -.-> problemGen
+    config -.-> problemGen
+    problemGen -- generate --> problem
+    problem -- problem instance --> pddlPlanner
+    domain -- domain model --> pddlPlanner
+    pddlPlanner -- plan --> planParser
+    contextGen -. fallback .-> planParser
+    planParser --> execution
+    execution -- Automatic Commands --> mqtt
+    security -- Alarm Trigger --> sms
+    security -- Automatic Commands --> mqtt
+    dashBackend -- Manual Commands --> mqtt
+    actuatorCtrl -- control --> actuators
+    actuatorCtrl -- actuator status --> mqtt
+    dashBackend <-- live updates --> dashboard
+    simEngine <-- live updates --> simulator
 ```
 
 ### How it works
