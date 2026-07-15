@@ -28,8 +28,14 @@ const {
 
 const RULES_FILE = path.join(__dirname, 'config', 'rules.json');
 const PORTS_FILE = path.join(__dirname, 'config', 'ports.json');
+const SETTINGS_FILE = path.join(__dirname, 'config', 'settings.json');
 const PDDL_DOMAIN_FILE = path.join(__dirname, 'pddl', 'domain.pddl');
 const PDDL_PROBLEM_FILE = path.join(__dirname, 'pddl', 'problem.pddl');
+
+const DEFAULT_SETTINGS = {
+  auth: { username: 'admin', password: 'admin' },
+  sms: { enabled: true, phoneNumber: '' }
+};
 
 const app = express();
 const server = http.createServer(app);
@@ -78,6 +84,7 @@ const pendingCommands = new Map();
 let commandCounter = 0;
 let rulesConfig = { ...DEFAULT_RULES };
 let portsConfig = { ...DEFAULT_PORTS };
+let settingsConfig = { ...DEFAULT_SETTINGS };
 
 function loadRulesFromDisk() {
   try {
@@ -188,6 +195,108 @@ function applyPortsUpdate(ports, socket) {
 }
 
 loadPortsFromDisk();
+
+function normalizeSettings(raw) {
+  const base = raw && typeof raw === 'object' ? raw : {};
+  const auth = base.auth && typeof base.auth === 'object' ? base.auth : {};
+  const sms = base.sms && typeof base.sms === 'object' ? base.sms : {};
+
+  return {
+    auth: {
+      username: typeof auth.username === 'string' && auth.username
+        ? auth.username
+        : DEFAULT_SETTINGS.auth.username,
+      password: typeof auth.password === 'string' && auth.password
+        ? auth.password
+        : DEFAULT_SETTINGS.auth.password
+    },
+    sms: {
+      enabled: typeof sms.enabled === 'boolean' ? sms.enabled : DEFAULT_SETTINGS.sms.enabled,
+      phoneNumber: typeof sms.phoneNumber === 'string' ? sms.phoneNumber : DEFAULT_SETTINGS.sms.phoneNumber
+    }
+  };
+}
+
+function loadSettingsFromDisk() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+      settingsConfig = normalizeSettings(raw);
+      return settingsConfig;
+    }
+  } catch (err) {
+    console.warn('Failed to load settings.json, using defaults:', err.message);
+  }
+
+  settingsConfig = normalizeSettings(DEFAULT_SETTINGS);
+  saveSettingsToDisk(settingsConfig);
+  return settingsConfig;
+}
+
+function saveSettingsToDisk(settings) {
+  const dir = path.dirname(SETTINGS_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2) + '\n');
+}
+
+// Never expose the password to clients.
+function getPublicSettings() {
+  return {
+    auth: { username: settingsConfig.auth.username },
+    sms: { ...settingsConfig.sms }
+  };
+}
+
+// Only the SMS-relevant part is broadcast (retained) to the sms_notifier node.
+function publishSettings() {
+  mqttClient.publish(
+    'greenhouse/settings',
+    JSON.stringify({ sms: settingsConfig.sms }),
+    { retain: true }
+  );
+}
+
+function applySettingsUpdate(update, socket) {
+  if (!update || typeof update !== 'object') {
+    if (socket) {
+      socket.emit('settings_nack', { reason: 'Invalid settings payload' });
+    }
+    return false;
+  }
+
+  const next = normalizeSettings(settingsConfig);
+  const auth = update.auth && typeof update.auth === 'object' ? update.auth : {};
+  const sms = update.sms && typeof update.sms === 'object' ? update.sms : {};
+
+  if (typeof auth.username === 'string' && auth.username.trim()) {
+    next.auth.username = auth.username.trim();
+  }
+  // Blank password means "leave unchanged".
+  if (typeof auth.password === 'string' && auth.password.length > 0) {
+    next.auth.password = auth.password;
+  }
+  if (typeof sms.enabled === 'boolean') {
+    next.sms.enabled = sms.enabled;
+  }
+  if (typeof sms.phoneNumber === 'string') {
+    next.sms.phoneNumber = sms.phoneNumber.trim();
+  }
+
+  settingsConfig = next;
+  saveSettingsToDisk(settingsConfig);
+  publishSettings();
+  io.emit('settings_update', getPublicSettings());
+
+  if (socket) {
+    socket.emit('settings_ack', { settings: getPublicSettings() });
+  }
+
+  return true;
+}
+
+loadSettingsFromDisk();
 
 function nowSec() {
   return Date.now() / 1000;
@@ -371,7 +480,8 @@ function getInitialData() {
     history: sensorHistory,
     events: eventLog,
     rules: rulesConfig,
-    ports: portsConfig
+    ports: portsConfig,
+    settings: getPublicSettings()
   };
 }
 
@@ -386,6 +496,7 @@ mqttClient.on('connect', () => {
 
   publishRulesConfig(rulesConfig);
   publishPortsConfig(portsConfig);
+  publishSettings();
 });
 
 mqttClient.on('message', (topic, message) => {
@@ -459,6 +570,23 @@ setInterval(() => {
 }, 2000);
 
 setInterval(resolvePendingCommands, 100);
+
+// Dummy login: plaintext compare against config/settings.json (project scope only).
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body || {};
+  if (
+    username === settingsConfig.auth.username &&
+    password === settingsConfig.auth.password
+  ) {
+    res.json({ ok: true });
+    return;
+  }
+  res.status(401).json({ ok: false, error: 'Invalid credentials' });
+});
+
+app.get('/api/settings', (req, res) => {
+  res.json(getPublicSettings());
+});
 
 app.get('/api/dashboard', (req, res) => {
   res.json(getInitialData());
@@ -557,6 +685,10 @@ io.on('connection', (socket) => {
 
   socket.on('update_ports', (ports) => {
     applyPortsUpdate(ports, socket);
+  });
+
+  socket.on('update_settings', (settings) => {
+    applySettingsUpdate(settings, socket);
   });
 
   socket.on('request_replan', () => {

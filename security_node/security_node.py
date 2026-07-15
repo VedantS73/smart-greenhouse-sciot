@@ -54,13 +54,14 @@ def heartbeat():
 # EVENTS
 # ---------------------------------
 
-def publish_event(message):
+def publish_event(message, reason=None):
 
     client.publish(
         "greenhouse/events",
         json.dumps({
             "source": "security",
             "message": message,
+            "reason": reason,
             "timestamp": time.time()
         })
     )
@@ -70,7 +71,13 @@ def publish_event(message):
 # PUBLISH ALARM
 # ---------------------------------
 
-def publish_alarm(led, buzzer):
+ALARM_MESSAGES = {
+    "intrusion": "Intrusion detected at night",
+    "overheat": "Critical temperature detected"
+}
+
+
+def publish_alarm(led, buzzer, reason=None):
 
     global alarm_state
 
@@ -96,9 +103,12 @@ def publish_alarm(led, buzzer):
     )
 
     if led or buzzer:
-        publish_event("Alarm activated")
+        publish_event(
+            ALARM_MESSAGES.get(reason, "Alarm activated"),
+            reason
+        )
     else:
-        publish_event("Alarm cleared")
+        publish_event("Alarm cleared", "cleared")
 
 
 # ---------------------------------
@@ -128,7 +138,8 @@ def evaluate_sensor_data(data):
 
         publish_alarm(
             True,
-            security.get("buzzerOnIntrusion", True)
+            security.get("buzzerOnIntrusion", True),
+            "intrusion"
         )
 
     elif overheat:
@@ -137,14 +148,16 @@ def evaluate_sensor_data(data):
 
         publish_alarm(
             True,
-            security.get("buzzerOnOverheat", True)
+            security.get("buzzerOnOverheat", True),
+            "overheat"
         )
 
     else:
 
         publish_alarm(
             False,
-            False
+            False,
+            None
         )
 
 

@@ -11,6 +11,8 @@ pkill -f dashboard.py 2>/dev/null || true
 pkill -f planner_node.py 2>/dev/null || true
 pkill -f server.js 2>/dev/null || true
 pkill -f security_node.py 2>/dev/null || true
+pkill -f sms_notifier.py 2>/dev/null || true
+pkill -f cloud_logger.py 2>/dev/null || true
 
 sleep 1
 

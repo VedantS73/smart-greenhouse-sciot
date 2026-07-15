@@ -17,6 +17,8 @@ pkill -f sensor_mux.py 2>/dev/null || true
 pkill -f actuator_subscriber.py 2>/dev/null || true
 pkill -f planner_node.py 2>/dev/null || true
 pkill -f security_node.py 2>/dev/null || true
+pkill -f sms_notifier.py 2>/dev/null || true
+pkill -f cloud_logger.py 2>/dev/null || true
 pkill -f dashboard.py 2>/dev/null || true
 pkill -f "node server.js" 2>/dev/null || true
 
@@ -47,6 +49,12 @@ nohup python3 "$SCRIPT_DIR/planner/planner_node.py" \
 
 nohup python3 "$SCRIPT_DIR/security_node/security_node.py" \
     > "$SCRIPT_DIR/logs/security.log" 2>&1 &
+
+nohup python3 "$SCRIPT_DIR/sms_notifier/sms_notifier.py" \
+    > "$SCRIPT_DIR/logs/sms_notifier.log" 2>&1 &
+
+nohup python3 "$SCRIPT_DIR/cloud_logger/cloud_logger.py" \
+    > "$SCRIPT_DIR/logs/cloud_logger.log" 2>&1 &
 
 nohup node "$SCRIPT_DIR/server.js" \
     > "$SCRIPT_DIR/logs/server.log" 2>&1 &

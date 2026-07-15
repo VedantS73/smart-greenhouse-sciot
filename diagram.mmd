@@ -1,0 +1,37 @@
+---
+config:
+    flowchart:
+        defaultRenderer: elk
+        theme: light
+---
+flowchart TB
+ subgraph physical["Physical Greenhouse"]
+        sensors["Sensors"]
+        actuators["Actuators"]
+  end
+ subgraph pi["Raspberry Pi"]
+        mqtt[("MQTT Broker")]
+        sensorSvc["Sensor Service"]
+        planner["AI Planner<br>(PDDL)"]
+        security["Security Manager"]
+        sms["SMS Notifier"]
+        actuatorCtrl["Actuator Controller"]
+        dashServer["Dashboard Server"]
+        kb[["Knowledge Base<br>PDDL + Rules"]]
+  end
+ subgraph browser["Browser"]
+        webui["Dashboard + Simulator"]
+  end
+    sensors -- readings --> sensorSvc
+    sensorSvc -- sensor data --> mqtt
+    mqtt --> planner & security & dashServer
+    kb -. knowledge .-> planner
+    planner -- auto commands --> mqtt
+    security -- auto commands --> mqtt
+    security -- alarm event --> mqtt
+    mqtt -- alarm event --> sms
+    dashServer -- manual commands --> mqtt
+    mqtt --> actuatorCtrl
+    actuatorCtrl -- control --> actuators
+    actuatorCtrl -- status --> mqtt
+    dashServer <-- live updates --> webui

@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { message } from 'antd';
 import io from 'socket.io-client';
 import Dashboard from './components/Dashboard';
+import LoginPage from './components/LoginPage';
 import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || window.location.origin;
+const AUTH_KEY = 'gh_authed';
 
 const emptySensors = {
   readings: {},
@@ -37,7 +39,13 @@ const defaultPorts = {
   }
 };
 
+const defaultSettings = {
+  auth: { username: 'admin' },
+  sms: { enabled: true, phoneNumber: '' }
+};
+
 function App() {
+  const [authed, setAuthed] = useState(() => localStorage.getItem(AUTH_KEY) === '1');
   const [data, setData] = useState({
     sensors: emptySensors,
     actuators: { led: false, relay1: false, relay2: false, relay3: false, buzzer: false },
@@ -46,7 +54,8 @@ function App() {
     history: { temperature: [], humidity: [], light: [] },
     events: [],
     rules: defaultRules,
-    ports: defaultPorts
+    ports: defaultPorts,
+    settings: defaultSettings
   });
   const [connected, setConnected] = useState(false);
   const [actuatorFeedback, setActuatorFeedback] = useState({});
@@ -54,6 +63,10 @@ function App() {
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
+    if (!authed) {
+      return undefined;
+    }
+
     const s = io(API_URL, {
       reconnection: true,
       reconnectionDelay: 1000,
@@ -75,7 +88,8 @@ function App() {
         history: initialData.history || {},
         events: initialData.events || [],
         rules: initialData.rules || defaultRules,
-        ports: initialData.ports || defaultPorts
+        ports: initialData.ports || defaultPorts,
+        settings: initialData.settings || defaultSettings
       });
     });
 
@@ -109,6 +123,10 @@ function App() {
 
     s.on('ports_update', (ports) => {
       setData((prev) => ({ ...prev, ports }));
+    });
+
+    s.on('settings_update', (settings) => {
+      setData((prev) => ({ ...prev, settings }));
     });
 
     s.on('actuator_ack', ({ device }) => {
@@ -163,7 +181,23 @@ function App() {
     return () => {
       s.disconnect();
     };
-  }, []);
+  }, [authed]);
+
+  const handleLogin = () => {
+    localStorage.setItem(AUTH_KEY, '1');
+    setAuthed(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem(AUTH_KEY);
+    setSocket(null);
+    setConnected(false);
+    setAuthed(false);
+  };
+
+  if (!authed) {
+    return <LoginPage apiUrl={API_URL} onLogin={handleLogin} />;
+  }
 
   if (!socket) {
     return null;
@@ -175,6 +209,10 @@ function App() {
 
   const handlePortsSaved = () => {
     message.success('Port mapping updated and applied');
+  };
+
+  const handleSettingsSaved = () => {
+    message.success('Settings updated');
   };
 
   const handleActuatorToggle = (device, state) => {
@@ -203,6 +241,8 @@ function App() {
         onActuatorToggle={handleActuatorToggle}
         onRulesSaved={handleRulesSaved}
         onPortsSaved={handlePortsSaved}
+        onSettingsSaved={handleSettingsSaved}
+        onLogout={handleLogout}
       />
     </div>
   );

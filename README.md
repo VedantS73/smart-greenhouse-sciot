@@ -13,6 +13,7 @@ The system is built around a **message bus** (MQTT). Components publish and subs
 config:
     flowchart:
         defaultRenderer: elk
+        theme: light
 ---
 flowchart TB
  subgraph physical["Physical Greenhouse"]

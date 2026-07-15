@@ -16,7 +16,9 @@ import {
   UnorderedListOutlined,
   ApiOutlined,
   ControlOutlined,
-  DeploymentUnitOutlined
+  DeploymentUnitOutlined,
+  SettingOutlined,
+  LogoutOutlined
 } from '@ant-design/icons';
 import SensorPanel from './SensorPanel';
 import ActuatorPanel from './ActuatorPanel';
@@ -26,6 +28,7 @@ import PlannerPanel from './PlannerPanel';
 import EventLog from './EventLog';
 import RulesSetupModal from './RulesSetupModal';
 import PortsSetupModal from './PortsSetupModal';
+import SettingsModal from './SettingsModal';
 import PlannerExplorerModal from './PlannerExplorerModal';
 import './Dashboard.css';
 
@@ -41,11 +44,14 @@ function Dashboard({
   pendingActuators,
   onActuatorToggle,
   onRulesSaved,
-  onPortsSaved
+  onPortsSaved,
+  onSettingsSaved,
+  onLogout
 }) {
   const [logOpen, setLogOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [portsOpen, setPortsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [plannerExplorerOpen, setPlannerExplorerOpen] = useState(false);
   const autoMode = data.planner?.auto_mode !== false;
   const readings = data.sensors?.readings || {};
@@ -121,6 +127,20 @@ function Dashboard({
                 onClick={() => setLogOpen(true)}
               />
             </Badge>
+          </Tooltip>
+          <Tooltip title="Settings">
+            <Button
+              type="text"
+              icon={<SettingOutlined />}
+              onClick={() => setSettingsOpen(true)}
+            />
+          </Tooltip>
+          <Tooltip title="Log out">
+            <Button
+              type="text"
+              icon={<LogoutOutlined />}
+              onClick={onLogout}
+            />
           </Tooltip>
         </Space>
       </Header>
@@ -216,6 +236,13 @@ function Dashboard({
         ports={data.ports}
         socket={socket}
         onPortsSaved={onPortsSaved}
+      />
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={data.settings}
+        socket={socket}
+        onSettingsSaved={onSettingsSaved}
       />
     </Layout>
   );
