@@ -25,11 +25,33 @@ import paho.mqtt.client as mqtt
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
-except ImportError:
-    pass
+
+def load_env(path):
+    # Prefer python-dotenv, but fall back to a minimal parser so the node
+    # works even when the package isn't installed (e.g. on the Pi).
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(path)
+        return
+    except ImportError:
+        pass
+
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                os.environ.setdefault(
+                    key.strip(),
+                    value.strip().strip('"').strip("'")
+                )
+    except FileNotFoundError:
+        print("SMS: no .env file found at", path)
+
+
+load_env(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 BROKER = os.environ.get("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))

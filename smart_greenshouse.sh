@@ -5,6 +5,10 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Flush Python stdout/stderr immediately so logs are written in real time
+# (Python block-buffers stdout when it is redirected to a file, not a TTY).
+export PYTHONUNBUFFERED=1
+
 echo "Starting Smart Greenhouse..."
 
 if ! pgrep mosquitto > /dev/null; then
