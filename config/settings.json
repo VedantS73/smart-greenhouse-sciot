@@ -1,0 +1,10 @@
+{
+  "auth": {
+    "username": "admin",
+    "password": "admin"
+  },
+  "sms": {
+    "enabled": true,
+    "phoneNumber": "+917977255640"
+  }
+}

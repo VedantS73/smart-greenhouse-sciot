@@ -1,9 +1,24 @@
 #!/usr/bin/env python3
 
+import os
+import sys
+
+sys.path.insert(
+    0,
+    os.path.join(
+        os.path.dirname(__file__),
+        ".."
+    )
+)
+
 import json
 import time
 import threading
 import paho.mqtt.client as mqtt
+from generate_problem import generate_problem
+from run_planner import run_planner
+from plan_parser import plan_to_actions, context_to_actions, plan_has_relay_commands
+from shared.rules_config import load_rules, apply_rules_update
 
 BROKER = "localhost"
 
@@ -11,11 +26,19 @@ client = mqtt.Client()
 
 current_state = {
     "led": False,
+    "buzzer": False,
     "relay1": False,
-    "relay2": False
+    "relay2": False,
+    "relay3": False
 }
 
 AUTO_MODE = True
+last_context = None
+last_sensor_data = None
+last_problem_pddl = ""
+last_plan_steps = []
+last_plan_source = "rules"
+RULES = load_rules()
 
 # ---------------------------------
 # HEARTBEAT
@@ -42,7 +65,10 @@ def heartbeat():
 def publish_planner_status(
     context=None,
     goal=None,
-    actions=None
+    actions=None,
+    plan=None,
+    problem_pddl=None,
+    plan_source=None
 ):
 
     client.publish(
@@ -60,6 +86,18 @@ def publish_planner_status(
 
             "auto_mode":
             AUTO_MODE,
+
+            "rules":
+            RULES,
+
+            "plan_steps":
+            plan if plan is not None else last_plan_steps,
+
+            "problem_pddl":
+            problem_pddl if problem_pddl is not None else last_problem_pddl,
+
+            "plan_source":
+            plan_source if plan_source is not None else last_plan_source,
 
             "timestamp":
             time.time()
@@ -100,15 +138,20 @@ def get_context(data):
         False
     )
 
+    temp_rules = RULES["temperature"]
+    humidity_rules = RULES["humidity"]
+    light_rules = RULES["light"]
+    soil_rules = RULES["soil"]
+
     # -----------------
     # LIGHT
     # -----------------
 
-    if light < 200:
+    if light < light_rules["lowBelow"]:
 
         context["light"] = "LOW"
 
-    elif light > 350:
+    elif light > light_rules["highAbove"]:
 
         context["light"] = "HIGH"
 
@@ -120,11 +163,11 @@ def get_context(data):
     # TEMPERATURE
     # -----------------
 
-    if temp > 30:
+    if temp > temp_rules["hotAbove"]:
 
         context["temperature"] = "HOT"
 
-    elif temp < 20:
+    elif temp < temp_rules["coldBelow"]:
 
         context["temperature"] = "COLD"
 
@@ -136,11 +179,11 @@ def get_context(data):
     # HUMIDITY
     # -----------------
 
-    if humidity < 40:
+    if humidity < humidity_rules["dryBelow"]:
 
         context["humidity"] = "DRY"
 
-    elif humidity > 70:
+    elif humidity > humidity_rules["wetAbove"]:
 
         context["humidity"] = "WET"
 
@@ -152,11 +195,11 @@ def get_context(data):
     # SOIL
     # -----------------
 
-    if moisture > 650:
+    if moisture > soil_rules["wetAbove"]:
 
         context["soil"] = "WET"
 
-    elif moisture < 450:
+    elif moisture < soil_rules["dryBelow"]:
 
         context["soil"] = "DRY"
 
@@ -194,45 +237,109 @@ def get_goal():
 
     }
 
+def relay_actions_differ(desired, actual):
+
+    for device in ("relay1", "relay2", "relay3"):
+        if bool(desired.get(device)) != bool(actual.get(device)):
+            return True
+
+    return False
+
+
+def resolve_actions(context, plan):
+
+    if plan and plan_has_relay_commands(plan):
+        return plan_to_actions(plan)
+
+    return context_to_actions(context, RULES)
+
+
 # ---------------------------------
 # PLANNER
 # ---------------------------------
 
-def generate_plan(context):
+def run_planning_pipeline(sensor_data, force=False):
 
-    actions = {}
+    global last_context, last_problem_pddl, last_plan_steps, last_plan_source
 
-    # LED
+    context = get_context(sensor_data)
+    goal = get_goal()
+    context_changed = force or context != last_context
+    plan = []
+    problem_pddl = last_problem_pddl
 
-    if context["light"] == "LOW":
+    if context_changed:
 
-        actions["led"] = True
+        problem_pddl = generate_problem(context, RULES)
+        last_problem_pddl = problem_pddl
 
+        print("\n===================================")
+        print("Generated Problem")
+        print(problem_pddl)
+
+        plan = run_planner()
+        last_plan_steps = plan
+        last_context = context.copy()
+
+        print("\nReturned Plan")
+        print(plan)
+
+    actions = resolve_actions(context, plan)
+    last_plan_source = (
+        "pddl"
+        if plan and plan_has_relay_commands(plan)
+        else "rules"
+    )
+
+    should_publish = (
+        AUTO_MODE and
+        relay_actions_differ(actions, current_state)
+    )
+
+    if context_changed or should_publish:
+        print("\n===================================")
+        print("Current Context")
+        print(context)
+        print("\nGoal State")
+        print(goal)
+        print("\nReturned Plan")
+        print(plan)
+        print("\nMQTT Actions")
+        print(actions)
+        print("\nAuto Mode")
+        print(AUTO_MODE)
+        print("===================================")
+
+    if should_publish:
+
+        client.publish(
+            "greenhouse/actions",
+            json.dumps(actions)
+        )
+
+    if context_changed or should_publish or force:
+        publish_planner_status(
+            context,
+            goal,
+            actions,
+            plan=plan,
+            problem_pddl=problem_pddl,
+            plan_source=last_plan_source
+        )
+
+
+def handle_replan():
+
+    global last_context
+
+    print("\nReplan requested")
+
+    last_context = None
+
+    if last_sensor_data:
+        run_planning_pipeline(last_sensor_data, force=True)
     else:
-
-        actions["led"] = False
-
-    # Relay1 (Fan)
-
-    if context["temperature"] == "HOT":
-
-        actions["relay1"] = True
-
-    else:
-
-        actions["relay1"] = False
-
-    # Relay2 (Pump)
-
-    if context["soil"] == "DRY":
-
-        actions["relay2"] = True
-
-    else:
-
-        actions["relay2"] = False
-
-    return actions
+        publish_planner_status()
 
 # ---------------------------------
 # ACTUATOR STATUS
@@ -242,7 +349,25 @@ def update_actuator_state(payload):
 
     global current_state
 
-    current_state = payload
+    current_state.update(payload)
+
+# ---------------------------------
+# CONFIG UPDATE
+# ---------------------------------
+
+def handle_config_update(payload):
+
+    global RULES, last_context
+
+    RULES = apply_rules_update(payload)
+
+    print("\nRules updated:")
+    print(json.dumps(RULES, indent=2))
+
+    last_context = None
+
+    if last_sensor_data:
+        run_planning_pipeline(last_sensor_data)
 
 # ---------------------------------
 # MQTT CALLBACK
@@ -250,7 +375,7 @@ def update_actuator_state(payload):
 
 def on_message(client, userdata, msg):
 
-    global AUTO_MODE
+    global AUTO_MODE, last_sensor_data
 
     try:
 
@@ -295,6 +420,26 @@ def on_message(client, userdata, msg):
             return
 
         # -----------------
+        # CONFIG UPDATE
+        # -----------------
+
+        if msg.topic == "greenhouse/config":
+
+            payload = json.loads(
+                msg.payload.decode()
+            )
+
+            handle_config_update(payload)
+
+            return
+
+        if msg.topic == "greenhouse/planner/replan":
+
+            handle_replan()
+
+            return
+
+        # -----------------
         # SENSOR DATA
         # -----------------
 
@@ -302,41 +447,9 @@ def on_message(client, userdata, msg):
             msg.payload.decode()
         )
 
-        context = get_context(
-            sensor_data
-        )
+        last_sensor_data = sensor_data.copy()
 
-        goal = get_goal()
-
-        actions = generate_plan(
-            context
-        )
-
-        print("\n===================================")
-        print("Current Context")
-        print(context)
-
-        print("\nGoal State")
-        print(goal)
-
-        print("\nPlanner Actions")
-        print(actions)
-
-        print("\nAuto Mode")
-        print(AUTO_MODE)
-
-        if AUTO_MODE:
-
-            client.publish(
-                "greenhouse/actions",
-                json.dumps(actions)
-            )
-
-        publish_planner_status(
-            context,
-            goal,
-            actions
-        )
+        run_planning_pipeline(sensor_data)
 
     except Exception as e:
 
@@ -367,6 +480,14 @@ client.subscribe(
 
 client.subscribe(
     "greenhouse/mode"
+)
+
+client.subscribe(
+    "greenhouse/config"
+)
+
+client.subscribe(
+    "greenhouse/planner/replan"
 )
 
 # ---------------------------------

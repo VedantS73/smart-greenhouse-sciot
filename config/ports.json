@@ -1,0 +1,16 @@
+{
+  "sensors": {
+    "sound": 0,
+    "light": 1,
+    "moisture": 2,
+    "temperatureHumidity": 7,
+    "motion": 8
+  },
+  "actuators": {
+    "buzzer": 2,
+    "relay1": 4,
+    "led": 3,
+    "relay2": 5,
+    "relay3": 6
+  }
+}

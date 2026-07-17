@@ -1,0 +1,32 @@
+{
+  "name": "smart-greenhouse",
+  "version": "2.0.0",
+  "description": "Smart Greenhouse IoT System with Real-time Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "postinstall": "cd frontend && npm install",
+    "build": "cd frontend && npm run build",
+    "build:simulator": "cd frontend && npm run build:simulator",
+    "build:all": "npm run build && npm run build:simulator",
+    "server": "node server.js",
+    "simulator": "node simulator_server.js",
+    "start:pi": "node server.js",
+    "start:python": "concurrently --names \"Publisher,Actuator,Planner\" \"python3 sensor_node/publisher.py\" \"python3 actuator_node/actuator_subscriber.py\" \"python3 planner/planner_node.py\"",
+    "client": "cd frontend && npm start",
+    "dev": "concurrently --names \"Server,Client\" \"node server.js\" \"cd frontend && npm start\"",
+    "start": "concurrently --names \"Python,Server\" \"npm run start:python\" \"npm run server\""
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "mqtt": "^4.3.7",
+    "socket.io": "^4.5.4"
+  },
+  "devDependencies": {
+    "concurrently": "^7.6.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
