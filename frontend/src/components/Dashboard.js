@@ -7,13 +7,12 @@ import {
   Typography,
   Row,
   Col,
-  Drawer,
   Button,
   Tooltip
 } from 'antd';
 import {
   ExperimentOutlined,
-  UnorderedListOutlined,
+  FileTextOutlined,
   ApiOutlined,
   ControlOutlined,
   DeploymentUnitOutlined,
@@ -25,10 +24,10 @@ import ActuatorPanel from './ActuatorPanel';
 import HealthStatus from './HealthStatus';
 import ChartsPanel from './ChartsPanel';
 import PlannerPanel from './PlannerPanel';
-import EventLog from './EventLog';
 import RulesSetupModal from './RulesSetupModal';
 import PortsSetupModal from './PortsSetupModal';
 import SettingsModal from './SettingsModal';
+import LiveLogsModal from './LiveLogsModal';
 import PlannerExplorerModal from './PlannerExplorerModal';
 import './Dashboard.css';
 
@@ -84,7 +83,6 @@ function Dashboard({
   };
 
   const healthScore = getHealthScore();
-  const eventCount = data.events?.length || 0;
 
   return (
     <Layout className="dashboard-layout">
@@ -119,14 +117,12 @@ function Dashboard({
               onClick={() => setPortsOpen(true)}
             />
           </Tooltip>
-          <Tooltip title="Activity log">
-            <Badge count={eventCount} size="small" offset={[-2, 2]}>
-              <Button
-                type="text"
-                icon={<UnorderedListOutlined />}
-                onClick={() => setLogOpen(true)}
-              />
-            </Badge>
+          <Tooltip title="Live logs">
+            <Button
+              type="text"
+              icon={<FileTextOutlined />}
+              onClick={() => setLogOpen(true)}
+            />
           </Tooltip>
           <Tooltip title="Settings">
             <Button
@@ -199,16 +195,11 @@ function Dashboard({
         </Space>
       </Footer>
 
-      <Drawer
-        title="Activity Log"
-        placement="right"
-        width={360}
+      <LiveLogsModal
         open={logOpen}
         onClose={() => setLogOpen(false)}
-        className="event-drawer"
-      >
-        <EventLog events={data.events} />
-      </Drawer>
+        socket={socket}
+      />
 
       <PlannerExplorerModal
         open={plannerExplorerOpen}

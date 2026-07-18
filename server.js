@@ -29,6 +29,7 @@ const {
 const RULES_FILE = path.join(__dirname, 'config', 'rules.json');
 const PORTS_FILE = path.join(__dirname, 'config', 'ports.json');
 const SETTINGS_FILE = path.join(__dirname, 'config', 'settings.json');
+const LOGS_DIR = path.join(__dirname, 'logs');
 const PDDL_DOMAIN_FILE = path.join(__dirname, 'pddl', 'domain.pddl');
 const PDDL_PROBLEM_FILE = path.join(__dirname, 'pddl', 'problem.pddl');
 
@@ -36,6 +37,145 @@ const DEFAULT_SETTINGS = {
   auth: { username: 'admin', password: 'admin' },
   sms: { enabled: true, phoneNumber: '' }
 };
+
+const LOG_TAIL_BYTES = 64 * 1024;
+const LOG_POLL_MS = 500;
+const DEFAULT_LOG_PREFERENCE = [
+  'server.log',
+  'security.log',
+  'sms_notifier.log',
+  'cloud_logger.log',
+  'planner.log',
+  'publisher.log'
+];
+
+// Per-socket live log watchers: socketId -> { timer, file, offset }
+const logWatchers = new Map();
+
+function listLogFiles() {
+  try {
+    if (!fs.existsSync(LOGS_DIR)) {
+      return [];
+    }
+    return fs.readdirSync(LOGS_DIR)
+      .filter((name) => /^[a-zA-Z0-9._-]+\.log$/.test(name))
+      .sort();
+  } catch (err) {
+    console.warn('Failed to list logs:', err.message);
+    return [];
+  }
+}
+
+function resolveLogPath(name) {
+  if (!name || typeof name !== 'string') {
+    return null;
+  }
+  if (!/^[a-zA-Z0-9._-]+\.log$/.test(name)) {
+    return null;
+  }
+  const full = path.resolve(LOGS_DIR, name);
+  if (!full.startsWith(path.resolve(LOGS_DIR) + path.sep) && full !== path.resolve(LOGS_DIR)) {
+    return null;
+  }
+  return full;
+}
+
+function pickDefaultLog(files) {
+  for (const preferred of DEFAULT_LOG_PREFERENCE) {
+    if (files.includes(preferred)) {
+      return preferred;
+    }
+  }
+  return files[0] || null;
+}
+
+function stopLogWatch(socketId) {
+  const watcher = logWatchers.get(socketId);
+  if (!watcher) {
+    return;
+  }
+  clearInterval(watcher.timer);
+  logWatchers.delete(socketId);
+}
+
+function startLogWatch(socket, fileName) {
+  stopLogWatch(socket.id);
+
+  const fullPath = resolveLogPath(fileName);
+  if (!fullPath) {
+    socket.emit('log_error', { reason: 'invalid_file', file: fileName });
+    return;
+  }
+
+  let offset = 0;
+  let initial = '';
+
+  try {
+    if (fs.existsSync(fullPath)) {
+      const stat = fs.statSync(fullPath);
+      offset = Math.max(0, stat.size - LOG_TAIL_BYTES);
+      const fd = fs.openSync(fullPath, 'r');
+      try {
+        const length = stat.size - offset;
+        const buf = Buffer.alloc(length);
+        fs.readSync(fd, buf, 0, length, offset);
+        initial = buf.toString('utf8');
+        // Drop a partial first line if we started mid-file.
+        if (offset > 0) {
+          const nl = initial.indexOf('\n');
+          if (nl !== -1) {
+            initial = initial.slice(nl + 1);
+          }
+        }
+        offset = stat.size;
+      } finally {
+        fs.closeSync(fd);
+      }
+    }
+  } catch (err) {
+    socket.emit('log_error', { reason: err.message, file: fileName });
+    return;
+  }
+
+  socket.emit('log_snapshot', {
+    file: fileName,
+    content: initial,
+    files: listLogFiles()
+  });
+
+  const timer = setInterval(() => {
+    try {
+      if (!fs.existsSync(fullPath)) {
+        return;
+      }
+      const stat = fs.statSync(fullPath);
+      // Log rotated / truncated.
+      if (stat.size < offset) {
+        offset = 0;
+      }
+      if (stat.size === offset) {
+        return;
+      }
+      const length = stat.size - offset;
+      const buf = Buffer.alloc(length);
+      const fd = fs.openSync(fullPath, 'r');
+      try {
+        fs.readSync(fd, buf, 0, length, offset);
+      } finally {
+        fs.closeSync(fd);
+      }
+      offset = stat.size;
+      const chunk = buf.toString('utf8');
+      if (chunk) {
+        socket.emit('log_append', { file: fileName, chunk });
+      }
+    } catch (err) {
+      socket.emit('log_error', { reason: err.message, file: fileName });
+    }
+  }, LOG_POLL_MS);
+
+  logWatchers.set(socket.id, { timer, file: fileName, offset });
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -647,6 +787,14 @@ app.get('/api/planner', (req, res) => {
   });
 });
 
+app.get('/api/logs', (req, res) => {
+  const files = listLogFiles();
+  res.json({
+    files,
+    defaultFile: pickDefaultLog(files)
+  });
+});
+
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`);
   socket.emit('initial_data', getInitialData());
@@ -709,7 +857,30 @@ io.on('connection', (socket) => {
     socket.emit('apply_planner_ack', { actions });
   });
 
+  socket.on('list_logs', () => {
+    const files = listLogFiles();
+    socket.emit('logs_list', {
+      files,
+      defaultFile: pickDefaultLog(files)
+    });
+  });
+
+  socket.on('subscribe_log', ({ file } = {}) => {
+    const files = listLogFiles();
+    const target = file && files.includes(file) ? file : pickDefaultLog(files);
+    if (!target) {
+      socket.emit('log_error', { reason: 'no_log_files' });
+      return;
+    }
+    startLogWatch(socket, target);
+  });
+
+  socket.on('unsubscribe_log', () => {
+    stopLogWatch(socket.id);
+  });
+
   socket.on('disconnect', () => {
+    stopLogWatch(socket.id);
     console.log(`Client disconnected: ${socket.id}`);
   });
 });
