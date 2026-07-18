@@ -14,6 +14,7 @@ sys.path.insert(
 import json
 import time
 import threading
+from datetime import datetime
 import paho.mqtt.client as mqtt
 from shared.rules_config import load_rules, apply_rules_update
 
@@ -112,6 +113,24 @@ def publish_alarm(led, buzzer, reason=None):
 
 
 # ---------------------------------
+# DAY / NIGHT
+# ---------------------------------
+
+def is_daytime():
+    """True if current hour falls in the Rules schedule day window."""
+
+    schedule = RULES.get("schedule", {})
+    day_start = schedule.get("dayStartHour", 6)
+    day_end = schedule.get("dayEndHour", 22)
+    hour = datetime.now().hour
+
+    if day_start < day_end:
+        return day_start <= hour < day_end
+
+    return hour >= day_start or hour < day_end
+
+
+# ---------------------------------
 # SENSOR EVALUATION
 # ---------------------------------
 
@@ -123,7 +142,10 @@ def evaluate_sensor_data(data):
     motion = data.get("motion", False)
     temperature = data.get("temperature", 25)
 
+    # Intrusion = motion + dark + NIGHT only.
+    # Daytime low light (e.g. cloudy / grow tent) must not trigger this.
     intrusion = (
+        (not is_daytime()) and
         motion and
         light < security["intrusionLightBelow"]
     )
